@@ -12,13 +12,17 @@ const config: Config = {
         'saffron-dark': '#E68A2E',
         brutal: {
           bg: '#FFFBF5',
-          border: '#1a1a1a',
-          shadow: '#1a1a1a',
-          accent: '#FF9933',
+          border: '#000000',
+          shadow: '#000000',
+          accent: '#A3FF00',
+          orange: '#FF6B00',
         },
+        'neon-green': '#A3FF00',
+        'neon-orange': '#FF6B00',
       },
       borderWidth: {
         '3': '3px',
+        '4': '4px',
       },
       boxShadow: {
         brutal: '4px 4px 0px #1a1a1a',

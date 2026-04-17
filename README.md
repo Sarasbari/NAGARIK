@@ -20,13 +20,13 @@ git clone <repo-url> && cd nagarik
 # 2. Setup environment
 cp app/.env.example app/.env
 cp website/.env.example website/.env
-cp ai/.env.example ai/.env
+cp ml/.env.example ml/.env
 
 # 3. Start Supabase local
 npx supabase start
 
-# 4. Start AI pipeline
-cd ai && pip install -r requirements.txt && uvicorn src.main:app --reload
+# 4. Start ML pipeline
+cd ml && pip install -r requirements.txt && uvicorn main:app --reload
 
 # 5. Start citizen app (mobile)
 cd app && npm install && npx expo start
@@ -41,7 +41,7 @@ cd website && npm install && npm run dev
 nagarik/
 ├── app/                 # 📱 React Native (Expo) — Public Citizen App
 ├── website/             # 🏛️ Next.js 14 — Government Officer Dashboard
-├── ai/                  # 🤖 Python FastAPI — AI Pipeline
+├── ml/                  # 🤖 Python FastAPI — ML Pipeline
 ├── supabase/            # 🗄️ DB schema + edge functions
 ├── claude-skills/       # AI coding assistant context
 ├── docs/                # presentation assets

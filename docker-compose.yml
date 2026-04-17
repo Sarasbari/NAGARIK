@@ -1,17 +1,18 @@
 version: "3.8"
 
 services:
-  ai:
+  ml:
     build:
-      context: ./ai
+      context: ./ml
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
     env_file:
-      - ./ai/.env
+      - ./ml/.env
     volumes:
-      - ./ai/src:/app/src
-      - ./ai/models:/app/models
+      - ./ml/routers:/app/routers
+      - ./ml/services:/app/services
+      - ./ml/models:/app/models
     restart: unless-stopped
     networks:
       - nagarik

@@ -1,4 +1,4 @@
-# 🤖 AI CLAUDE — FastAPI + Gemini Specs
+# 🤖 ML CLAUDE — FastAPI + YOLOv8 + Gemini Specs
 
 ## Framework
 - FastAPI with lifespan context manager
@@ -8,17 +8,19 @@
 ## Endpoints
 | Endpoint | Method | Input | Output |
 |----------|--------|-------|--------|
-| `/classify` | POST | image + lat/lng | type, severity, ward, dept |
+| `/analyze` | POST | image + optional lat/lng | type, severity, confidence, dept, fake status, duplicate status |
 | `/heatmap` | GET | — | weighted point list |
 | `/duplicate-check` | POST | lat/lng + type | is_dup, dup_id |
 
-## Classification Flow
+## Analysis Flow
 1. Receive image bytes via multipart upload
-2. Send to Gemini Vision API with structured prompt
-3. Parse response → match to category enum
-4. Fallback: YOLOv8 `best.pt` if Gemini fails
-5. Calculate severity (base + image + location modifiers)
-6. Route: GPS → bounding-box ward → department map
+2. Fake Check: ELA + EXIF scanning
+3. GPS Extract: Pull coordinates from EXIF if not provided
+4. Classify: Run YOLOv8 inference for issue type
+5. Validate: Fallback to Gemini Vision if YOLOv8 confidence < 0.5
+6. Calculate severity based on type and confidence
+7. Route: GPS → bounding-box ward → department map
+8. Duplicate: Haversine < 50m check
 
 ## Gemini Prompt Pattern
 ```

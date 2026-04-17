@@ -30,9 +30,9 @@ venv/
 *.egg
 
 # AI model weights
-ai/models/*.pt
-ai/models/*.onnx
-!ai/models/.gitkeep
+ml/models/*.pt
+ml/models/*.onnx
+!ml/models/.gitkeep
 
 # Supabase
 .supabase/

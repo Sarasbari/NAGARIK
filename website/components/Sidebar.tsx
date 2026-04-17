@@ -13,7 +13,9 @@ import {
     Flame,
     LogOut,
     User,
-    Loader2
+    Loader2,
+    Radar,
+    Radio,
 } from 'lucide-react';
 
 interface NavItemProps {
@@ -83,6 +85,9 @@ export default function Sidebar() {
                 <NavItem icon={Droplets} label="Water Leaks" href="/water-leaks" />
                 <NavItem icon={Trash2} label="Overflowing Bins" href="/bins" />
                 <NavItem icon={Flame} label="Fames" href="/fames" />
+                <div className="border-b-4 border-black border-dashed" />
+                <NavItem icon={Radar} label="Radar AI" href="/radar" />
+                <NavItem icon={Radio} label="Command Center" href="/command" />
             </nav>
 
             <div className="p-4 bg-gray-50 border-t-4 border-black">

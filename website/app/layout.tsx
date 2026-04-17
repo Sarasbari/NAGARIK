@@ -5,7 +5,7 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { LocationProvider } from '@/contexts/LocationContext';
 
 export const metadata: Metadata = {
-  title: 'Nagarik Dashboard — Municipal Command Center',
+  title: 'Nagarik',
   description: 'AI-powered civic issue tracking and dispatch system for municipal officers.',
 };
 

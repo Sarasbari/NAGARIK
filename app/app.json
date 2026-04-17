@@ -1,0 +1,37 @@
+{
+  "expo": {
+    "name": "Nagarik",
+    "slug": "nagarik",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FF9933"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.nagarik.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Nagarik needs camera access to photograph civic issues.",
+        "NSLocationWhenInUseUsageDescription": "Nagarik needs your location to tag issue reports."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#FF9933"
+      },
+      "package": "com.nagarik.app",
+      "permissions": ["CAMERA", "ACCESS_FINE_LOCATION"]
+    },
+    "plugins": [
+      "expo-camera",
+      "expo-location",
+      "expo-notifications"
+    ]
+  }
+}

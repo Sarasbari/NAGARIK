@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
     MapContainer,
     TileLayer,
@@ -9,8 +9,6 @@ import {
     ZoomControl,
     CircleMarker,
     Polygon,
-    LayersControl,
-    LayerGroup,
     Tooltip,
 } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -23,27 +21,52 @@ import {
     Eye,
     EyeOff,
     Filter,
-    Construction,
-    Droplets,
-    Flame,
     CircleDot,
+    ThumbsUp,
+    Clock,
 } from 'lucide-react';
+import { createClient } from '@/utils/supabase/client';
+
+// ─── Types ──────────────────────────────────────────────────────────
+
+interface Complaint {
+    id: string;
+    category: string;
+    title: string;
+    description: string;
+    area: string;
+    city: string;
+    state: string;
+    latitude: number;
+    longitude: number;
+    status: string;
+    upvotes: number;
+    submitted_at: string;
+}
+
+// ─── Category Mapping ───────────────────────────────────────────────
+
+const CATEGORY_MAP: Record<string, string> = {
+    'Road Pothole': 'pothole',
+    'Water Leak': 'water_leak',
+    'Drainage Blocking': 'drainage',
+    'Overflowing Garbage': 'garbage',
+};
+
+const CATEGORY_COLORS: Record<string, { bg: string; glow: string; label: string }> = {
+    pothole:    { bg: '#ef4444', glow: '#ef444480', label: 'Pothole' },
+    water_leak: { bg: '#3b82f6', glow: '#3b82f680', label: 'Water Leak' },
+    drainage:   { bg: '#06b6d4', glow: '#06b6d480', label: 'Drainage' },
+    garbage:    { bg: '#a855f7', glow: '#a855f780', label: 'Garbage' },
+};
 
 // ─── Custom Marker Icons ────────────────────────────────────────────
 
-const CATEGORY_COLORS: Record<string, { bg: string; glow: string; label: string }> = {
-    pothole:     { bg: '#ef4444', glow: '#ef444480', label: 'Pothole' },
-    road_damage: { bg: '#f97316', glow: '#f9731680', label: 'Road Damage' },
-    drainage:    { bg: '#3b82f6', glow: '#3b82f680', label: 'Drainage' },
-    garbage:     { bg: '#a855f7', glow: '#a855f780', label: 'Garbage' },
-    streetlight: { bg: '#eab308', glow: '#eab30880', label: 'Streetlight' },
-    other:       { bg: '#6b7280', glow: '#6b728080', label: 'Other' },
-};
-
-const issueIcon = (type: string, severity: number) => {
-    const color = CATEGORY_COLORS[type] || CATEGORY_COLORS.other;
-    const size = severity >= 4 ? 18 : severity >= 3 ? 14 : 11;
-    const pulse = severity >= 4 ? `
+const issueIcon = (type: string, upvotes: number) => {
+    const color = CATEGORY_COLORS[type] || CATEGORY_COLORS.pothole;
+    // Scale marker based on upvotes
+    const size = upvotes >= 60 ? 18 : upvotes >= 40 ? 14 : 11;
+    const pulse = upvotes >= 60 ? `
         <div style="
             position: absolute; top: 50%; left: 50%;
             width: ${size + 14}px; height: ${size + 14}px;
@@ -66,61 +89,13 @@ const issueIcon = (type: string, severity: number) => {
                     border-radius: 50%;
                     background: ${color.bg};
                     border: 2px solid rgba(255,255,255,0.9);
-                    box-shadow: 0 0 ${severity >= 4 ? 12 : 6}px ${color.glow}, 0 2px 4px rgba(0,0,0,0.3);
+                    box-shadow: 0 0 ${upvotes >= 60 ? 12 : 6}px ${color.glow}, 0 2px 4px rgba(0,0,0,0.3);
                 "></div>
             </div>`,
         iconSize: [size + 16, size + 16],
         iconAnchor: [(size + 16) / 2, (size + 16) / 2],
     });
 };
-
-// ─── Mock Data ──────────────────────────────────────────────────────
-
-const MOCK_ISSUES = [
-    { id: 1,  lat: 28.6139, lng: 77.2090, type: 'pothole',     severity: 5, area: 'Connaught Place, Delhi',     status: 'open',        reported: '2h ago' },
-    { id: 2,  lat: 28.5355, lng: 77.3910, type: 'road_damage', severity: 4, area: 'Noida Sector 62',            status: 'assigned',    reported: '5h ago' },
-    { id: 3,  lat: 19.0760, lng: 72.8777, type: 'pothole',     severity: 3, area: 'Marine Drive, Mumbai',       status: 'open',        reported: '1d ago' },
-    { id: 4,  lat: 12.9716, lng: 77.5946, type: 'drainage',    severity: 4, area: 'MG Road, Bangalore',         status: 'in_progress', reported: '3h ago' },
-    { id: 5,  lat: 22.5726, lng: 88.3639, type: 'road_damage', severity: 5, area: 'Park Street, Kolkata',       status: 'open',        reported: '30m ago' },
-    { id: 6,  lat: 26.9124, lng: 75.7873, type: 'pothole',     severity: 3, area: 'MI Road, Jaipur',            status: 'resolved',    reported: '2d ago' },
-    { id: 7,  lat: 17.3850, lng: 78.4867, type: 'drainage',    severity: 4, area: 'Banjara Hills, Hyderabad',   status: 'assigned',    reported: '6h ago' },
-    { id: 8,  lat: 13.0827, lng: 80.2707, type: 'pothole',     severity: 2, area: 'T. Nagar, Chennai',          status: 'open',        reported: '1d ago' },
-    { id: 9,  lat: 23.0225, lng: 72.5714, type: 'road_damage', severity: 3, area: 'SG Highway, Ahmedabad',      status: 'in_progress', reported: '8h ago' },
-    { id: 10, lat: 18.5204, lng: 73.8567, type: 'pothole',     severity: 5, area: 'FC Road, Pune',              status: 'open',        reported: '1h ago' },
-    { id: 11, lat: 28.6280, lng: 77.2190, type: 'garbage',     severity: 3, area: 'Karol Bagh, Delhi',          status: 'open',        reported: '4h ago' },
-    { id: 12, lat: 19.0180, lng: 72.8560, type: 'streetlight', severity: 2, area: 'Dadar, Mumbai',              status: 'assigned',    reported: '12h ago' },
-    { id: 13, lat: 28.5800, lng: 77.2300, type: 'drainage',    severity: 5, area: 'Saket, Delhi',               status: 'open',        reported: '45m ago' },
-    { id: 14, lat: 12.9350, lng: 77.6100, type: 'garbage',     severity: 4, area: 'Koramangala, Bangalore',     status: 'in_progress', reported: '2h ago' },
-    { id: 15, lat: 22.5450, lng: 88.3500, type: 'streetlight', severity: 3, area: 'Salt Lake, Kolkata',         status: 'open',        reported: '6h ago' },
-];
-
-// Ward boundary polygons (simplified mock)
-const WARD_ZONES = [
-    {
-        name: 'Delhi NCR Zone',
-        color: '#ef4444',
-        positions: [
-            [28.70, 77.10], [28.70, 77.45], [28.45, 77.45], [28.45, 77.10],
-        ] as [number, number][],
-        issueCount: 4,
-    },
-    {
-        name: 'Mumbai Metro Zone',
-        color: '#3b82f6',
-        positions: [
-            [19.15, 72.78], [19.15, 72.95], [18.95, 72.95], [18.95, 72.78],
-        ] as [number, number][],
-        issueCount: 3,
-    },
-    {
-        name: 'Bangalore Urban Zone',
-        color: '#10b981',
-        positions: [
-            [13.05, 77.50], [13.05, 77.70], [12.85, 77.70], [12.85, 77.50],
-        ] as [number, number][],
-        issueCount: 2,
-    },
-];
 
 // ─── Tile Layers ────────────────────────────────────────────────────
 
@@ -150,13 +125,12 @@ const TILE_LAYERS = {
 const LABELS_URL = 'https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png';
 
 const STATUS_BADGES: Record<string, { label: string; class: string }> = {
-    open:        { label: 'Open',        class: 'bg-red-100 text-red-700' },
-    assigned:    { label: 'Assigned',    class: 'bg-yellow-100 text-yellow-700' },
-    in_progress: { label: 'In Progress', class: 'bg-blue-100 text-blue-700' },
-    resolved:    { label: 'Resolved',    class: 'bg-green-100 text-green-700' },
+    'Pending':  { label: 'Pending',  class: 'bg-yellow-100 text-yellow-700' },
+    'Resolved': { label: 'Resolved', class: 'bg-green-100 text-green-700' },
+    'Rejected': { label: 'Rejected', class: 'bg-red-100 text-red-700' },
 };
 
-// ─── Pulse animation (injected once via style tag) ──────────────────
+// ─── Pulse animation ────────────────────────────────────────────────
 
 const PulseStyle = () => (
     <style>{`
@@ -166,6 +140,18 @@ const PulseStyle = () => (
         }
     `}</style>
 );
+
+// ─── Helper ─────────────────────────────────────────────────────────
+
+function timeAgo(dateStr: string): string {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const days = Math.floor(diff / 86400000);
+    if (days > 0) return `${days}d ago`;
+    const hours = Math.floor(diff / 3600000);
+    if (hours > 0) return `${hours}h ago`;
+    const mins = Math.floor(diff / 60000);
+    return `${mins}m ago`;
+}
 
 // ─── Component ──────────────────────────────────────────────────────
 
@@ -177,8 +163,30 @@ export default function DashboardMap() {
     const [tileMode, setTileMode] = useState<TileMode>('satellite');
     const [activeFilters, setActiveFilters] = useState<Set<IssueType>>(new Set(Object.keys(CATEGORY_COLORS)));
     const [showHeatZones, setShowHeatZones] = useState(true);
-    const [showWards, setShowWards] = useState(false);
     const [showOverlayPanel, setShowOverlayPanel] = useState(true);
+    const [complaints, setComplaints] = useState<Complaint[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    // Fetch complaints from Supabase
+    useEffect(() => {
+        const fetchComplaints = async () => {
+            const supabase = createClient();
+            const { data, error } = await supabase
+                .from('complaints')
+                .select('id, category, title, description, area, city, state, latitude, longitude, status, upvotes, submitted_at')
+                .not('latitude', 'is', null)
+                .not('longitude', 'is', null);
+
+            if (error) {
+                console.error('Error fetching complaints:', error.message);
+            } else {
+                setComplaints(data || []);
+            }
+            setIsLoading(false);
+        };
+
+        fetchComplaints();
+    }, []);
 
     const currentTile = TILE_LAYERS[tileMode];
 
@@ -191,20 +199,34 @@ export default function DashboardMap() {
         });
     };
 
-    const filteredIssues = useMemo(
-        () => MOCK_ISSUES.filter(i => activeFilters.has(i.type)),
-        [activeFilters]
+    const filteredComplaints = useMemo(
+        () => complaints.filter(c => {
+            const mappedType = CATEGORY_MAP[c.category] || 'pothole';
+            return activeFilters.has(mappedType);
+        }),
+        [activeFilters, complaints]
     );
 
     const stats = useMemo(() => ({
-        total: filteredIssues.length,
-        critical: filteredIssues.filter(i => i.severity >= 4).length,
-        open: filteredIssues.filter(i => i.status === 'open').length,
-    }), [filteredIssues]);
+        total: filteredComplaints.length,
+        critical: filteredComplaints.filter(c => c.upvotes >= 50).length,
+        pending: filteredComplaints.filter(c => c.status === 'Pending').length,
+    }), [filteredComplaints]);
 
     return (
         <div className="flex-1 bg-black border-4 border-black relative overflow-hidden shadow-brutal min-h-[600px]">
             <PulseStyle />
+
+            {/* Loading overlay */}
+            {isLoading && (
+                <div className="absolute inset-0 z-[2000] bg-black/80 flex items-center justify-center">
+                    <div className="flex items-center gap-3">
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent animate-spin rounded-full" />
+                        <span className="text-white text-xs font-black uppercase tracking-widest">Loading live data...</span>
+                    </div>
+                </div>
+            )}
+
             <MapContainer
                 center={center}
                 zoom={5}
@@ -224,76 +246,59 @@ export default function DashboardMap() {
                 <ZoomControl position="bottomright" />
 
                 {/* ── Overlay: Heat zones ──────────────────────────── */}
-                {showHeatZones && filteredIssues.map(issue => (
-                    <CircleMarker
-                        key={`heat-${issue.id}`}
-                        center={[issue.lat, issue.lng]}
-                        radius={issue.severity * 18}
-                        pathOptions={{
-                            fillColor: CATEGORY_COLORS[issue.type]?.bg || '#6b7280',
-                            fillOpacity: 0.12,
-                            stroke: true,
-                            color: CATEGORY_COLORS[issue.type]?.bg || '#6b7280',
-                            weight: 1,
-                            opacity: 0.25,
-                        }}
-                    />
-                ))}
-
-                {/* ── Overlay: Ward boundaries ────────────────────── */}
-                {showWards && WARD_ZONES.map(ward => (
-                    <Polygon
-                        key={ward.name}
-                        positions={ward.positions}
-                        pathOptions={{
-                            color: ward.color,
-                            weight: 2,
-                            fillColor: ward.color,
-                            fillOpacity: 0.08,
-                            dashArray: '8 4',
-                        }}
-                    >
-                        <Tooltip sticky className="!bg-black/80 !text-white !border-white/20 !rounded-lg !text-[10px] !font-bold !uppercase !tracking-wider !px-3 !py-1.5">
-                            {ward.name} — {ward.issueCount} issues
-                        </Tooltip>
-                    </Polygon>
-                ))}
+                {showHeatZones && filteredComplaints.map(c => {
+                    const mappedType = CATEGORY_MAP[c.category] || 'pothole';
+                    const colors = CATEGORY_COLORS[mappedType] || CATEGORY_COLORS.pothole;
+                    const radius = Math.max(20, Math.min(c.upvotes * 0.8, 60));
+                    return (
+                        <CircleMarker
+                            key={`heat-${c.id}`}
+                            center={[c.latitude, c.longitude]}
+                            radius={radius}
+                            pathOptions={{
+                                fillColor: colors.bg,
+                                fillOpacity: 0.12,
+                                stroke: true,
+                                color: colors.bg,
+                                weight: 1,
+                                opacity: 0.25,
+                            }}
+                        />
+                    );
+                })}
 
                 {/* ── Issue Markers ────────────────────────────────── */}
-                {filteredIssues.map(issue => {
-                    const cat = CATEGORY_COLORS[issue.type] || CATEGORY_COLORS.other;
-                    const badge = STATUS_BADGES[issue.status] || STATUS_BADGES.open;
+                {filteredComplaints.map(c => {
+                    const mappedType = CATEGORY_MAP[c.category] || 'pothole';
+                    const cat = CATEGORY_COLORS[mappedType] || CATEGORY_COLORS.pothole;
+                    const badge = STATUS_BADGES[c.status] || STATUS_BADGES['Pending'];
                     return (
                         <Marker
-                            key={issue.id}
-                            position={[issue.lat, issue.lng]}
-                            icon={issueIcon(issue.type, issue.severity)}
+                            key={c.id}
+                            position={[c.latitude, c.longitude]}
+                            icon={issueIcon(mappedType, c.upvotes)}
                         >
                             <Popup className="leaflet-popup-custom">
-                                <div className="font-sans w-52">
+                                <div className="font-sans w-60">
                                     <div className="flex items-center justify-between mb-1.5">
                                         <span className="font-black uppercase text-xs tracking-wide" style={{ color: cat.bg }}>
-                                            {cat.label}
+                                            {c.category}
                                         </span>
                                         <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${badge.class}`}>
                                             {badge.label}
                                         </span>
                                     </div>
-                                    <p className="text-gray-600 text-xs mb-2">{issue.area}</p>
+                                    <p className="text-[11px] font-bold text-gray-800 mb-1 leading-tight">{c.title}</p>
+                                    <p className="text-gray-500 text-[10px] mb-2">{c.area}, {c.city}</p>
                                     <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-1">
-                                            <span className="text-[9px] font-bold uppercase text-gray-400">Severity</span>
-                                            <div className="flex gap-0.5">
-                                                {[1, 2, 3, 4, 5].map(i => (
-                                                    <div
-                                                        key={i}
-                                                        className="w-1.5 h-1.5 rounded-full"
-                                                        style={{ background: i <= issue.severity ? cat.bg : '#e5e7eb' }}
-                                                    />
-                                                ))}
-                                            </div>
+                                        <div className="flex items-center gap-1.5">
+                                            <ThumbsUp size={10} className="text-gray-400" />
+                                            <span className="text-[9px] font-bold text-gray-500">{c.upvotes} upvotes</span>
                                         </div>
-                                        <span className="text-[9px] text-gray-400">{issue.reported}</span>
+                                        <div className="flex items-center gap-1">
+                                            <Clock size={10} className="text-gray-400" />
+                                            <span className="text-[9px] text-gray-400">{timeAgo(c.submitted_at)}</span>
+                                        </div>
                                     </div>
                                 </div>
                             </Popup>
@@ -375,15 +380,6 @@ export default function DashboardMap() {
                                         {showHeatZones ? <Eye size={10} /> : <EyeOff size={10} />}
                                         Heat Zones
                                     </button>
-                                    <button
-                                        onClick={() => setShowWards(p => !p)}
-                                        className={`flex items-center gap-2 w-full px-2 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all ${
-                                            showWards ? 'bg-white/10 text-white' : 'text-white/30 hover:text-white/50'
-                                        }`}
-                                    >
-                                        {showWards ? <Eye size={10} /> : <EyeOff size={10} />}
-                                        Ward Boundaries
-                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -395,6 +391,8 @@ export default function DashboardMap() {
                     <div className="flex items-center gap-2 mb-3">
                         <AlertCircle size={13} className="text-red-400" />
                         <h4 className="font-black uppercase text-[9px] tracking-[0.2em]">National Overview</h4>
+                        <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse ml-auto" />
+                        <span className="text-[7px] font-bold uppercase text-green-400 tracking-wider">Live</span>
                     </div>
                     <div className="grid grid-cols-3 gap-3">
                         <div>
@@ -403,11 +401,11 @@ export default function DashboardMap() {
                         </div>
                         <div>
                             <p className="text-lg font-black text-red-400">{stats.critical}</p>
-                            <p className="text-[8px] uppercase text-white/40 font-bold tracking-wider">Critical</p>
+                            <p className="text-[8px] uppercase text-white/40 font-bold tracking-wider">High Priority</p>
                         </div>
                         <div>
-                            <p className="text-lg font-black text-yellow-400">{stats.open}</p>
-                            <p className="text-[8px] uppercase text-white/40 font-bold tracking-wider">Open</p>
+                            <p className="text-lg font-black text-yellow-400">{stats.pending}</p>
+                            <p className="text-[8px] uppercase text-white/40 font-bold tracking-wider">Pending</p>
                         </div>
                     </div>
                 </div>

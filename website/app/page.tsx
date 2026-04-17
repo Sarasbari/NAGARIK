@@ -3,6 +3,8 @@ import Header from '@/components/Header';
 import StatCard from '@/components/StatCard';
 import ControlPanel from '@/components/ControlPanel';
 import dynamic from 'next/dynamic';
+import { cookies } from 'next/headers';
+import { createClient } from '@/utils/supabase/server';
 import {
   AlertTriangle,
   Droplets,
@@ -15,7 +17,35 @@ const DashboardMap = dynamic(() => import('@/components/DashboardMap'), {
   loading: () => <div className="flex-1 bg-gray-100 border-4 border-black animate-pulse flex items-center justify-center font-black uppercase italic">Loading Command Map...</div>
 });
 
-export default function Home() {
+export default async function Home() {
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
+
+  // Fetch real counts from Supabase
+  const [potholeRes, waterRes, garbageRes, totalRes] = await Promise.all([
+    supabase
+      .from('complaints')
+      .select('*', { count: 'exact', head: true })
+      .eq('category', 'Road Pothole'),
+    supabase
+      .from('complaints')
+      .select('*', { count: 'exact', head: true })
+      .in('category', ['Water Leak', 'Drainage Blocking']),
+    supabase
+      .from('complaints')
+      .select('*', { count: 'exact', head: true })
+      .eq('category', 'Overflowing Garbage'),
+    supabase
+      .from('complaints')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'Pending'),
+  ]);
+
+  const potholeCount = potholeRes.count ?? 0;
+  const waterCount = waterRes.count ?? 0;
+  const garbageCount = garbageRes.count ?? 0;
+  const pendingCount = totalRes.count ?? 0;
+
   return (
     <div className="min-h-screen bg-white">
       <Sidebar />
@@ -28,27 +58,27 @@ export default function Home() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <StatCard
                 title="Active Potholes"
-                value="1,402"
-                trend="+12%"
-                trendLabel="Since 00:00"
+                value={potholeCount}
+                trend={`${pendingCount} pending`}
+                trendLabel="Total"
                 icon={AlertTriangle}
                 iconColor="text-neon-orange"
                 href="/potholes"
               />
               <StatCard
-                title="Water Leaks"
-                value="42"
-                trend="80%"
-                trendLabel="Contained"
+                title="Water & Drainage"
+                value={waterCount}
+                trend="Live"
+                trendLabel="From Supabase"
                 icon={Droplets}
                 iconColor="text-blue-500"
                 href="/water-leaks"
               />
               <StatCard
                 title="Overflowing Bins"
-                value="284"
-                trend="Peak"
-                trendLabel="Collection Phase"
+                value={garbageCount}
+                trend="Live"
+                trendLabel="From Supabase"
                 icon={Trash2}
                 iconColor="text-neon-orange"
                 href="/bins"

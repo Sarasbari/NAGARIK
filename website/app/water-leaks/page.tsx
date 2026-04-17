@@ -1,67 +1,83 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from '@/components/Sidebar';
 import Header from '@/components/Header';
 import IssueCard from '@/components/IssueCard';
 import IssueDetailModal from '@/components/IssueDetailModal';
 import { useLocation } from '@/contexts/LocationContext';
+import { createClient } from '@/utils/supabase/client';
 
-const STATS = [
-    { label: 'Open Reports', value: '842', bg: 'bg-white', color: 'text-black' },
-    { label: 'Major Bursts', value: '15', bg: 'bg-neon-orange', color: 'text-white' },
-    { label: 'Resolved Today', value: '45', bg: 'bg-neon-green', color: 'text-black' },
-];
+interface Complaint {
+    id: string;
+    title: string;
+    description: string;
+    area: string;
+    city: string;
+    state: string;
+    status: string;
+    upvotes: number;
+    image_url: string;
+    submitted_at: string;
+    landmark: string;
+    category: string;
+}
 
-const LEAKS = [
-    {
-        title: 'Main Pipeline Burst - Sector 12',
-        description: 'Significant flooding in the basement of nearby apartments. Pressure drop reported in District 03.',
-        location: 'Gurgaon',
-        subLocation: 'Cyber Hub North',
-        timeAgo: '22 Mins Ago',
-        status: 'CRITICAL' as const,
-        image: 'https://images.unsplash.com/photo-1542013936693-884638332954?q=80&w=200&h=150&auto=format&fit=crop',
-        stats: [
-            { label: 'Water Loss Rate', value: '450 L/hr', color: 'text-neon-orange' },
-            { label: 'Property Risk', value: 'SEVERE', color: 'text-neon-orange' }
-        ]
-    },
-    {
-        title: 'Faulty Hydrant Leakage',
-        description: 'Valve failure causing continuous water wastage on the main road. Icy patches forming due to low temp.',
-        location: 'Shimla',
-        subLocation: 'Mall Road',
-        timeAgo: '2 Hours Ago',
-        status: 'MED' as const,
-        image: 'https://images.unsplash.com/photo-1517646281694-2244a0467599?q=80&w=200&h=150&auto=format&fit=crop',
-        stats: [
-            { label: 'Pipe Pressure', value: '42 PSI', color: 'text-yellow-500' },
-            { label: 'Traffic Impact', value: 'MINOR' }
-        ]
-    },
-    {
-        title: 'Underground Seepage - Metro Station',
-        description: 'Water dripping from ceiling in the concourse area. Structural integrity assessment required.',
-        location: 'Kolkata',
-        subLocation: 'Park Street Metro',
-        timeAgo: '5 Hours Ago',
-        status: 'HIGH' as const,
-        image: 'https://images.unsplash.com/photo-1521208690623-f4c02931a7f6?q=80&w=200&h=150&auto=format&fit=crop',
-        stats: [
-            { label: 'Structure Risk', value: 'ELEVATED', color: 'text-yellow-500' },
-            { label: 'Repair Scope', value: 'COMPLEX' }
-        ]
-    }
-];
+function timeAgo(dateStr: string): string {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const days = Math.floor(diff / 86400000);
+    if (days > 0) return `${days}d ago`;
+    const hours = Math.floor(diff / 3600000);
+    if (hours > 0) return `${hours}h ago`;
+    const mins = Math.floor(diff / 60000);
+    return `${mins}m ago`;
+}
+
+function mapStatus(status: string, upvotes: number): 'CRITICAL' | 'HIGH' | 'MED' {
+    if (status === 'Rejected') return 'MED';
+    if (upvotes >= 50) return 'CRITICAL';
+    if (upvotes >= 25) return 'HIGH';
+    return 'MED';
+}
 
 export default function WaterLeaksPage() {
     const [selectedIssue, setSelectedIssue] = useState<any>(null);
+    const [complaints, setComplaints] = useState<Complaint[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
     const { selectedCity } = useLocation();
 
-    const filteredLeaks = selectedCity === 'All'
-        ? LEAKS
-        : LEAKS.filter(leak => leak.location === selectedCity);
+    useEffect(() => {
+        const fetchData = async () => {
+            const supabase = createClient();
+            const { data, error } = await supabase
+                .from('complaints')
+                .select('*')
+                .in('category', ['Water Leak', 'Drainage Blocking'])
+                .order('submitted_at', { ascending: false });
+
+            if (error) {
+                console.error('Error fetching water/drainage:', error.message);
+            } else {
+                setComplaints(data || []);
+            }
+            setIsLoading(false);
+        };
+        fetchData();
+    }, []);
+
+    const filteredComplaints = selectedCity === 'All'
+        ? complaints
+        : complaints.filter(c => c.city === selectedCity);
+
+    const openCount = filteredComplaints.filter(c => c.status === 'Pending').length;
+    const criticalCount = filteredComplaints.filter(c => c.upvotes >= 50).length;
+    const resolvedCount = filteredComplaints.filter(c => c.status === 'Resolved').length;
+
+    const STATS = [
+        { label: 'Open Reports', value: isLoading ? '...' : String(openCount), bg: 'bg-white', color: 'text-black' },
+        { label: 'Major Issues', value: isLoading ? '...' : String(criticalCount), bg: 'bg-neon-orange', color: 'text-white' },
+        { label: 'Resolved', value: isLoading ? '...' : String(resolvedCount), bg: 'bg-neon-green', color: 'text-black' },
+    ];
 
     return (
         <div className="min-h-screen bg-white">
@@ -72,7 +88,7 @@ export default function WaterLeaksPage() {
             />
             <Sidebar />
             <div className="ml-64 flex flex-col min-h-screen">
-                <Header title="WATER LEAKS" />
+                <Header title="WATER & DRAINAGE" />
 
                 <main className="flex-1 p-8 bg-dot-grid">
                     <div className="max-w-[1200px] mx-auto space-y-12">
@@ -103,17 +119,50 @@ export default function WaterLeaksPage() {
                                         <div className="w-2 h-2 bg-neon-green" />
                                         <span className="text-[10px] font-black uppercase">Minor Seepage</span>
                                     </div>
+                                    <div className="flex items-center gap-2 px-3 py-1">
+                                        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                                        <span className="text-[10px] font-black uppercase text-green-600">Live</span>
+                                    </div>
                                 </div>
                             </div>
 
                             <div className="space-y-6">
-                                {LEAKS.map((leak, idx) => (
-                                    <IssueCard
-                                        key={idx}
-                                        {...leak}
-                                        onClick={() => setSelectedIssue(leak)}
-                                    />
-                                ))}
+                                {isLoading ? (
+                                    <div className="border-4 border-black p-8 text-center bg-gray-50 animate-pulse">
+                                        <span className="font-black uppercase italic">Loading complaints from Supabase...</span>
+                                    </div>
+                                ) : filteredComplaints.length > 0 ? (
+                                    filteredComplaints.map((c) => (
+                                        <IssueCard
+                                            key={c.id}
+                                            title={c.title}
+                                            description={c.description}
+                                            location={c.city}
+                                            subLocation={c.area}
+                                            timeAgo={timeAgo(c.submitted_at)}
+                                            status={mapStatus(c.status, c.upvotes)}
+                                            image={c.image_url || 'https://placehold.co/200x150?text=No+Image'}
+                                            onClick={() => setSelectedIssue({
+                                                id: c.id,
+                                                title: c.title,
+                                                description: c.description,
+                                                location: c.city,
+                                                subLocation: c.area,
+                                                status: mapStatus(c.status, c.upvotes),
+                                                image: c.image_url || 'https://placehold.co/600x400?text=No+Image',
+                                                date: new Date(c.submitted_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase(),
+                                                stats: [
+                                                    { label: 'Category', value: c.category.toUpperCase() },
+                                                    { label: 'Upvotes', value: String(c.upvotes), color: c.upvotes >= 50 ? 'text-neon-orange' : '' },
+                                                ],
+                                            })}
+                                        />
+                                    ))
+                                ) : (
+                                    <div className="border-4 border-black p-8 text-center bg-gray-50 italic font-bold">
+                                        NO WATER/DRAINAGE ISSUES IN {selectedCity.toUpperCase()}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>

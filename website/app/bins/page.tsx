@@ -1,158 +1,82 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from '@/components/Sidebar';
 import Header from '@/components/Header';
 import IssueCard from '@/components/IssueCard';
 import IssueDetailModal from '@/components/IssueDetailModal';
 import { useLocation } from '@/contexts/LocationContext';
+import { createClient } from '@/utils/supabase/client';
 
-const STATS = [
-    { label: 'Open Reports', value: '284', bg: 'bg-white', color: 'text-black' },
-    { label: 'Critical Overflow', value: '12', bg: 'bg-neon-orange', color: 'text-white' },
-    { label: 'Cleared Today', value: '56', bg: 'bg-neon-green', color: 'text-black' },
-];
+interface Complaint {
+    id: string;
+    title: string;
+    description: string;
+    area: string;
+    city: string;
+    state: string;
+    status: string;
+    upvotes: number;
+    image_url: string;
+    submitted_at: string;
+    landmark: string;
+}
 
-const BIN_ISSUES = [
-    {
-        title: 'Public Market Dumpster Overflow',
-        description: 'Waste spilling onto pedestrian path. Biological hazard risk due to food waste. Immediate pickup required.',
-        location: 'Mumbai',
-        subLocation: 'Crawford Market',
-        timeAgo: '5 Mins Ago',
-        status: 'CRITICAL' as const,
-        image: 'https://images.unsplash.com/photo-1532996122724-e3c354a0b15b?q=80&w=200&h=150&auto=format&fit=crop',
-        stats: [
-            { label: 'Fill Level', value: '110%', color: 'text-neon-orange' },
-            { label: 'Bio Hazard', value: 'CRITICAL', color: 'text-neon-orange' }
-        ]
-    },
-    {
-        title: 'Residential Bin Max Capacity',
-        description: 'Sensor alert: Bin #742 at 98% capacity. Scheduled pickup missed. Overflow expected within 1 hour.',
-        location: 'Bangalore',
-        subLocation: 'Indiranagar 100ft Rd',
-        timeAgo: '45 Mins Ago',
-        status: 'HIGH' as const,
-        image: 'https://images.unsplash.com/photo-1591336397302-01f8d39c7e0c?q=80&w=200&h=150&auto=format&fit=crop',
-        stats: [
-            { label: 'Sensor Alert', value: '98%', color: 'text-yellow-500' },
-            { label: 'Est. Fill Time', value: '1 HR' }
-        ]
-    },
-    {
-        title: 'Illegal Dumping - Coastal Road',
-        description: 'Non-designated waste found at bin site. Construction debris blocking bin access.',
-        location: 'Chennai',
-        subLocation: 'Marina Beach South',
-        timeAgo: '3 Hours Ago',
-        status: 'MED' as const,
-        image: 'https://images.unsplash.com/photo-1618477434951-7f9984687989?q=80&w=200&h=150&auto=format&fit=crop',
-        stats: [
-            { label: 'Debris Type', value: 'CONSTRUCTION' },
-            { label: 'Pickup Delay', value: '+4 HRS', color: 'text-yellow-500' }
-        ]
-    },
-    {
-        title: 'Cyber City Corporate Dumping',
-        description: 'Uncategorized tech waste overflowing from standard collection bins. Requires hazmat sorting.',
-        location: 'Gurgaon',
-        subLocation: 'DLF Cyber City',
-        timeAgo: '10 Mins Ago',
-        status: 'CRITICAL' as const,
-        image: 'https://images.unsplash.com/photo-1473445730015-841f29a949ce?q=80&w=200&h=150&auto=format&fit=crop',
-        stats: [
-            { label: 'E-Waste Level', value: 'HIGH', color: 'text-neon-orange' },
-            { label: 'Action Reqd', value: 'HAZMAT TEAM' }
-        ]
-    },
-    {
-        title: 'Connaught Place Festival Waste',
-        description: 'Post-event cleanup missed. Cardboard and plastic scattered across 500m area. High visibility area.',
-        location: 'Delhi',
-        subLocation: 'Connaught Place Inner Circle',
-        timeAgo: '20 Mins Ago',
-        status: 'HIGH' as const,
-        image: 'https://images.unsplash.com/photo-1605600659908-0ef719419d41?q=80&w=200&h=150&auto=format&fit=crop',
-        stats: [
-            { label: 'Spread Area', value: '500m sq', color: 'text-yellow-500' },
-            { label: 'Bio Hazard', value: 'MODERATE' }
-        ]
-    },
-    {
-        title: 'Tech Park Dumpster Fire Risk',
-        description: 'Large cardboard accumulation near smoking zone. Flammable material spilling outward.',
-        location: 'Pune',
-        subLocation: 'Hinjewadi Phase 2',
-        timeAgo: '1 Hour Ago',
-        status: 'CRITICAL' as const,
-        image: 'https://images.unsplash.com/photo-1611284446314-60a58ac0deb9?q=80&w=200&h=150&auto=format&fit=crop',
-        stats: [
-            { label: 'Fire Risk', value: 'SEVERE', color: 'text-neon-orange' },
-            { label: 'Material', value: 'CARDBOARD' }
-        ]
-    },
-    {
-        title: 'Old City Alleyway Blockage',
-        description: 'Two full bins overturned, blocking narrow pedestrian alley. Stray animals scattering waste.',
-        location: 'Ahmedabad',
-        subLocation: 'Manek Chowk',
-        timeAgo: '2 Hours Ago',
-        status: 'HIGH' as const,
-        image: 'https://images.unsplash.com/photo-1528323273322-d81458248d40?q=80&w=200&h=150&auto=format&fit=crop',
-        stats: [
-            { label: 'Path Blocked', value: 'YES', color: 'text-neon-orange' },
-            { label: 'Animal Risk', value: 'HIGH' }
-        ]
-    },
-    {
-        title: 'Charminar Food Street Overflow',
-        description: 'Weekend food waste exceeding bin capacity by 200%. Foul odor reported by tourists.',
-        location: 'Hyderabad',
-        subLocation: 'Laad Bazaar',
-        timeAgo: '30 Mins Ago',
-        status: 'CRITICAL' as const,
-        image: 'https://images.unsplash.com/photo-1595278069441-2f29f803e599?q=80&w=200&h=150&auto=format&fit=crop',
-        stats: [
-            { label: 'Bio Hazard', value: 'CRITICAL', color: 'text-neon-orange' },
-            { label: 'Waste Type', value: 'ORGANIC' }
-        ]
-    },
-    {
-        title: 'Hooghly Riverfront Illegal Dumping',
-        description: 'Private contractors dumping construction waste into municipal bins meant for pedestrians.',
-        location: 'Kolkata',
-        subLocation: 'Prinsep Ghat',
-        timeAgo: '4 Hours Ago',
-        status: 'MED' as const,
-        image: 'https://images.unsplash.com/photo-1595278069441-2f29f803e599?q=80&w=200&h=150&auto=format&fit=crop',
-        stats: [
-            { label: 'Violation', value: 'COMMERCIAL', color: 'text-yellow-500' },
-            { label: 'Bin Damage', value: 'MINOR' }
-        ]
-    },
-    {
-        title: 'Tourist Hub Plastic Accumulation',
-        description: 'Hundreds of plastic bottles overflowing from bins near the main palace entrance.',
-        location: 'Jaipur',
-        subLocation: 'City Palace Gate',
-        timeAgo: '15 Mins Ago',
-        status: 'HIGH' as const,
-        image: 'https://images.unsplash.com/photo-1528323273322-d81458248d40?q=80&w=200&h=150&auto=format&fit=crop',
-        stats: [
-            { label: 'Plastic Vol', value: 'CRITICAL', color: 'text-yellow-500' },
-            { label: 'Recyclable', value: 'YES' }
-        ]
-    }
-];
+function timeAgo(dateStr: string): string {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const days = Math.floor(diff / 86400000);
+    if (days > 0) return `${days}d ago`;
+    const hours = Math.floor(diff / 3600000);
+    if (hours > 0) return `${hours}h ago`;
+    const mins = Math.floor(diff / 60000);
+    return `${mins}m ago`;
+}
+
+function mapStatus(status: string, upvotes: number): 'CRITICAL' | 'HIGH' | 'MED' {
+    if (status === 'Rejected') return 'MED';
+    if (upvotes >= 50) return 'CRITICAL';
+    if (upvotes >= 25) return 'HIGH';
+    return 'MED';
+}
 
 export default function BinsPage() {
     const [selectedIssue, setSelectedIssue] = useState<any>(null);
+    const [complaints, setComplaints] = useState<Complaint[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
     const { selectedCity } = useLocation();
 
-    const filteredIssues = selectedCity === 'All'
-        ? BIN_ISSUES
-        : BIN_ISSUES.filter(issue => issue.location === selectedCity);
+    useEffect(() => {
+        const fetchData = async () => {
+            const supabase = createClient();
+            const { data, error } = await supabase
+                .from('complaints')
+                .select('*')
+                .eq('category', 'Overflowing Garbage')
+                .order('submitted_at', { ascending: false });
+
+            if (error) {
+                console.error('Error fetching bins:', error.message);
+            } else {
+                setComplaints(data || []);
+            }
+            setIsLoading(false);
+        };
+        fetchData();
+    }, []);
+
+    const filteredComplaints = selectedCity === 'All'
+        ? complaints
+        : complaints.filter(c => c.city === selectedCity);
+
+    const openCount = filteredComplaints.filter(c => c.status === 'Pending').length;
+    const criticalCount = filteredComplaints.filter(c => c.upvotes >= 50).length;
+    const resolvedCount = filteredComplaints.filter(c => c.status === 'Resolved').length;
+
+    const STATS = [
+        { label: 'Open Reports', value: isLoading ? '...' : String(openCount), bg: 'bg-white', color: 'text-black' },
+        { label: 'Critical Overflow', value: isLoading ? '...' : String(criticalCount), bg: 'bg-neon-orange', color: 'text-white' },
+        { label: 'Cleared', value: isLoading ? '...' : String(resolvedCount), bg: 'bg-neon-green', color: 'text-black' },
+    ];
 
     return (
         <div className="min-h-screen bg-white">
@@ -194,16 +118,43 @@ export default function BinsPage() {
                                         <div className="w-2 h-2 bg-neon-green" />
                                         <span className="text-[10px] font-black uppercase">High Fill</span>
                                     </div>
+                                    <div className="flex items-center gap-2 px-3 py-1">
+                                        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                                        <span className="text-[10px] font-black uppercase text-green-600">Live</span>
+                                    </div>
                                 </div>
                             </div>
 
                             <div className="space-y-6">
-                                {filteredIssues.length > 0 ? (
-                                    filteredIssues.map((issue, idx) => (
+                                {isLoading ? (
+                                    <div className="border-4 border-black p-8 text-center bg-gray-50 animate-pulse">
+                                        <span className="font-black uppercase italic">Loading complaints from Supabase...</span>
+                                    </div>
+                                ) : filteredComplaints.length > 0 ? (
+                                    filteredComplaints.map((c) => (
                                         <IssueCard
-                                            key={idx}
-                                            {...issue}
-                                            onClick={() => setSelectedIssue(issue)}
+                                            key={c.id}
+                                            title={c.title}
+                                            description={c.description}
+                                            location={c.city}
+                                            subLocation={c.area}
+                                            timeAgo={timeAgo(c.submitted_at)}
+                                            status={mapStatus(c.status, c.upvotes)}
+                                            image={c.image_url || 'https://placehold.co/200x150?text=No+Image'}
+                                            onClick={() => setSelectedIssue({
+                                                id: c.id,
+                                                title: c.title,
+                                                description: c.description,
+                                                location: c.city,
+                                                subLocation: c.area,
+                                                status: mapStatus(c.status, c.upvotes),
+                                                image: c.image_url || 'https://placehold.co/600x400?text=No+Image',
+                                                date: new Date(c.submitted_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase(),
+                                                stats: [
+                                                    { label: 'Upvotes', value: String(c.upvotes), color: c.upvotes >= 50 ? 'text-neon-orange' : '' },
+                                                    { label: 'Status', value: c.status.toUpperCase(), color: c.status === 'Resolved' ? 'text-green-600' : 'text-yellow-500' },
+                                                ],
+                                            })}
                                         />
                                     ))
                                 ) : (

@@ -2,6 +2,7 @@
   "expo": {
     "name": "Nagarik",
     "slug": "nagarik",
+    "scheme": "nagarik",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -11,7 +12,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#FF9933"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.nagarik.app",
@@ -26,12 +29,25 @@
         "backgroundColor": "#FF9933"
       },
       "package": "com.nagarik.app",
-      "permissions": ["CAMERA", "ACCESS_FINE_LOCATION"]
+      "permissions": [
+        "CAMERA",
+        "ACCESS_FINE_LOCATION"
+      ]
     },
     "plugins": [
       "expo-camera",
       "expo-location",
-      "expo-notifications"
+      "expo-notifications",
+      "expo-asset",
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Nagrik needs photo library access to attach incident images.",
+          "cameraPermission": "Nagrik needs camera access to capture incident photos."
+        }
+      ],
+      "expo-web-browser"
     ]
   }
 }

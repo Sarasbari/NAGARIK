@@ -1,80 +1,111 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
-
-interface User {
-    name: string;
-    email: string;
-    image: string;
-}
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createClient } from '@/utils/supabase/client';
+import type { User, Session } from '@supabase/supabase-js';
 
 interface AuthContextType {
     user: User | null;
+    session: Session | null;
     isLoggedIn: boolean;
-    login: () => void;
-    logout: () => void;
+    isLoading: boolean;
+    signInWithGoogle: () => Promise<void>;
+    signInWithEmail: (email: string, password: string) => Promise<{ error: string | null }>;
+    signUpWithEmail: (email: string, password: string) => Promise<{ error: string | null }>;
+    signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
-    const [isLoggedIn, setIsLoggedIn] = useState(false);
+    const [session, setSession] = useState<Session | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
 
-    // Initialize with dummy user for demo if needed, but per request we start logged in or out
-    // Let's start with a mock user as "logged in" by default to match current state, 
-    // but provide the logout functionality.
+    const supabase = createClient();
+
     useEffect(() => {
-        const savedUser = localStorage.getItem('nagarik_user');
-        if (savedUser) {
-            setUser(JSON.parse(savedUser));
-            setIsLoggedIn(true);
-        } else {
-            // Default mock user if nothing saved
-            const mockUser = {
-                name: 'Officer Arjun',
-                email: 'arjun@municipal.gov',
-                image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=400&h=400&auto=format&fit=crop'
-            };
-            setUser(mockUser);
-            setIsLoggedIn(true);
-            localStorage.setItem('nagarik_user', JSON.stringify(mockUser));
-        }
+        // Get the initial session
+        const getInitialSession = async () => {
+            const { data: { session: initialSession } } = await supabase.auth.getSession();
+            setSession(initialSession);
+            setUser(initialSession?.user ?? null);
+            setIsLoading(false);
+        };
+
+        getInitialSession();
+
+        // Listen for auth state changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+            (_event, newSession) => {
+                setSession(newSession);
+                setUser(newSession?.user ?? null);
+                setIsLoading(false);
+            }
+        );
+
+        return () => {
+            subscription.unsubscribe();
+        };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const login = () => {
-        const MOCK_USERS = [
-            {
-                name: 'Neha Gupta',
-                email: 'neha.gupta@municipal.gov',
-                image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400&h=400&auto=format&fit=crop'
+    const signInWithGoogle = useCallback(async () => {
+        const { error } = await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: {
+                redirectTo: `${window.location.origin}/auth/callback`,
             },
-            {
-                name: 'Arjun Verma',
-                email: 'arjun.verma@municipal.gov',
-                image: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=400&h=400&auto=format&fit=crop'
+        });
+        if (error) {
+            console.error('Google sign-in error:', error.message);
+        }
+    }, [supabase.auth]);
+
+    const signInWithEmail = useCallback(async (email: string, password: string) => {
+        const { error } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+        });
+        if (error) {
+            return { error: error.message };
+        }
+        return { error: null };
+    }, [supabase.auth]);
+
+    const signUpWithEmail = useCallback(async (email: string, password: string) => {
+        const { error } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+                emailRedirectTo: `${window.location.origin}/auth/callback`,
             },
-            {
-                name: 'Siddharth Roy',
-                email: 'sid.roy@municipal.gov',
-                image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=400&h=400&auto=format&fit=crop'
-            }
-        ];
+        });
+        if (error) {
+            return { error: error.message };
+        }
+        return { error: null };
+    }, [supabase.auth]);
 
-        const selectedUser = MOCK_USERS[Math.floor(Math.random() * MOCK_USERS.length)];
-        setUser(selectedUser);
-        setIsLoggedIn(true);
-        localStorage.setItem('nagarik_user', JSON.stringify(selectedUser));
-    };
-
-    const logout = () => {
+    const signOut = useCallback(async () => {
+        await supabase.auth.signOut();
         setUser(null);
-        setIsLoggedIn(false);
-        localStorage.removeItem('nagarik_user');
-    };
+        setSession(null);
+    }, [supabase.auth]);
 
     return (
-        <AuthContext.Provider value={{ user, isLoggedIn, login, logout }}>
+        <AuthContext.Provider
+            value={{
+                user,
+                session,
+                isLoggedIn: !!user,
+                isLoading,
+                signInWithGoogle,
+                signInWithEmail,
+                signUpWithEmail,
+                signOut,
+            }}
+        >
             {children}
         </AuthContext.Provider>
     );

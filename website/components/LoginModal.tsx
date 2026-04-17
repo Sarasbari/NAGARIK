@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X } from 'lucide-react';
+import { X, Mail, Lock, Eye, EyeOff, ArrowRight, UserPlus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface LoginModalProps {
@@ -10,42 +10,105 @@ interface LoginModalProps {
 }
 
 export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
-    const { login } = useAuth();
+    const { signInWithGoogle, signInWithEmail, signUpWithEmail } = useAuth();
     const [isLoading, setIsLoading] = useState(false);
+    const [isSignUp, setIsSignUp] = useState(false);
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
     if (!isOpen) return null;
 
-    const handleGoogleLogin = () => {
+    const handleGoogleLogin = async () => {
         setIsLoading(true);
-        // Simulate Google OAuth delay
-        setTimeout(() => {
-            login();
-            setIsLoading(false);
-            onClose();
-        }, 1500);
+        setError(null);
+        await signInWithGoogle();
+        // OAuth redirects away, so no need to setIsLoading(false)
+    };
+
+    const handleEmailSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsLoading(true);
+        setError(null);
+        setSuccessMessage(null);
+
+        if (isSignUp) {
+            const { error: signUpError } = await signUpWithEmail(email, password);
+            if (signUpError) {
+                setError(signUpError);
+            } else {
+                setSuccessMessage('Check your email for a confirmation link.');
+                setEmail('');
+                setPassword('');
+            }
+        } else {
+            const { error: signInError } = await signInWithEmail(email, password);
+            if (signInError) {
+                setError(signInError);
+            } else {
+                onClose();
+            }
+        }
+        setIsLoading(false);
+    };
+
+    const resetState = () => {
+        setError(null);
+        setSuccessMessage(null);
+        setEmail('');
+        setPassword('');
     };
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
             <div className="bg-white border-8 border-black w-full max-w-md shadow-[16px_16px_0px_0px_rgba(0,0,0,1)] animate-in fade-in zoom-in duration-200">
                 <div className="border-b-8 border-black p-6 flex justify-between items-center bg-neon-green">
-                    <h2 className="text-3xl font-black uppercase italic tracking-tighter">System Access</h2>
+                    <h2 className="text-3xl font-black uppercase italic tracking-tighter">
+                        {isSignUp ? 'Create Account' : 'System Access'}
+                    </h2>
                     <button onClick={onClose} className="p-1 hover:bg-black/10 transition-colors">
                         <X size={32} />
                     </button>
                 </div>
 
-                <div className="p-8 space-y-8">
+                <div className="p-8 space-y-6">
                     <div className="space-y-2">
-                        <p className="text-xs font-black uppercase tracking-widest text-gray-400">Authorization Required</p>
-                        <h3 className="text-2xl font-black italic tracking-tight">Identity Verification</h3>
-                        <p className="text-sm font-medium text-gray-600">Please sign in with your municipal G-Suite account to access the command center.</p>
+                        <p className="text-xs font-black uppercase tracking-widest text-gray-400">
+                            Authorization Required
+                        </p>
+                        <h3 className="text-2xl font-black italic tracking-tight">
+                            {isSignUp ? 'Officer Registration' : 'Identity Verification'}
+                        </h3>
+                        <p className="text-sm font-medium text-gray-600">
+                            {isSignUp
+                                ? 'Register with your municipal email to access the command center.'
+                                : 'Sign in with your credentials to access the command center.'}
+                        </p>
                     </div>
 
+                    {/* Error Message */}
+                    {error && (
+                        <div className="border-4 border-red-500 bg-red-50 p-3 flex items-start gap-2">
+                            <div className="w-2 h-2 bg-red-500 mt-1.5 flex-shrink-0" />
+                            <p className="text-xs font-bold text-red-700 uppercase">{error}</p>
+                        </div>
+                    )}
+
+                    {/* Success Message */}
+                    {successMessage && (
+                        <div className="border-4 border-green-500 bg-green-50 p-3 flex items-start gap-2">
+                            <div className="w-2 h-2 bg-green-500 mt-1.5 flex-shrink-0" />
+                            <p className="text-xs font-bold text-green-700 uppercase">{successMessage}</p>
+                        </div>
+                    )}
+
+                    {/* Google OAuth */}
                     <button
                         onClick={handleGoogleLogin}
                         disabled={isLoading}
-                        className="w-full flex items-center justify-center gap-4 bg-white border-4 border-black p-4 text-xl font-black uppercase italic shadow-brutal hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] active:translate-x-0 active:translate-y-0 active:shadow-none transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
+                        className="w-full flex items-center justify-center gap-4 bg-white border-4 border-black p-4 text-xl font-black uppercase italic shadow-brutal hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] active:translate-x-0 active:translate-y-0 active:shadow-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {isLoading ? (
                             <div className="w-6 h-6 border-4 border-black border-t-transparent animate-spin" />
@@ -58,14 +121,97 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                                         className="w-5 h-5 object-contain"
                                     />
                                 </div>
-                                <span className="whitespace-nowrap">Sign in with Google</span>
+                                <span className="whitespace-nowrap text-base">Sign in with Google</span>
                             </>
                         )}
                     </button>
 
-                    <div className="pt-4 flex items-center gap-2">
+                    {/* Divider */}
+                    <div className="flex items-center gap-4">
+                        <div className="flex-1 h-1 bg-black" />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Or</span>
+                        <div className="flex-1 h-1 bg-black" />
+                    </div>
+
+                    {/* Email / Password Form */}
+                    <form onSubmit={handleEmailSubmit} className="space-y-4">
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-gray-500">
+                                Email
+                            </label>
+                            <div className="relative">
+                                <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                <input
+                                    type="email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    placeholder="officer@municipal.gov"
+                                    required
+                                    className="w-full border-4 border-black p-3 pl-10 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-neon-green focus:border-black placeholder:text-gray-300"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-gray-500">
+                                Password
+                            </label>
+                            <div className="relative">
+                                <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                <input
+                                    type={showPassword ? 'text' : 'password'}
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    placeholder="••••••••"
+                                    required
+                                    minLength={6}
+                                    className="w-full border-4 border-black p-3 pl-10 pr-10 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-neon-green focus:border-black placeholder:text-gray-300"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black transition-colors"
+                                >
+                                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                </button>
+                            </div>
+                        </div>
+
+                        <button
+                            type="submit"
+                            disabled={isLoading}
+                            className="w-full flex items-center justify-center gap-3 bg-black text-white border-4 border-black p-4 font-black uppercase italic text-base shadow-[4px_4px_0px_0px_rgba(0,0,0,0.3)] hover:bg-gray-900 active:translate-y-[2px] active:shadow-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {isLoading ? (
+                                <div className="w-5 h-5 border-3 border-white border-t-transparent animate-spin" />
+                            ) : (
+                                <>
+                                    {isSignUp ? <UserPlus size={18} /> : <ArrowRight size={18} />}
+                                    <span>{isSignUp ? 'Create Account' : 'Sign In'}</span>
+                                </>
+                            )}
+                        </button>
+                    </form>
+
+                    {/* Toggle sign-up / sign-in */}
+                    <div className="text-center">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setIsSignUp(!isSignUp);
+                                resetState();
+                            }}
+                            className="text-xs font-bold text-gray-500 hover:text-black uppercase tracking-wide transition-colors"
+                        >
+                            {isSignUp
+                                ? '← Already have an account? Sign In'
+                                : 'No account? Create One →'}
+                        </button>
+                    </div>
+
+                    <div className="pt-2 flex items-center gap-2">
                         <div className="w-2 h-2 bg-neon-orange animate-pulse" />
-                        <span className="text-[10px] font-black uppercase tracking-widest">Secure_Layer_v4.2</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest">Supabase_Auth_v2</span>
                     </div>
                 </div>
             </div>

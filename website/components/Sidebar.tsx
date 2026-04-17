@@ -12,7 +12,8 @@ import {
     Trash2,
     Flame,
     LogOut,
-    User
+    User,
+    Loader2
 } from 'lucide-react';
 
 interface NavItemProps {
@@ -40,8 +41,33 @@ const NavItem = ({ icon: Icon, label, href }: NavItemProps) => {
 };
 
 export default function Sidebar() {
-    const { user, isLoggedIn, logout } = useAuth();
+    const { user, isLoggedIn, isLoading, signOut } = useAuth();
     const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+    const [isSigningOut, setIsSigningOut] = useState(false);
+
+    const handleSignOut = async () => {
+        setIsSigningOut(true);
+        await signOut();
+        setIsSigningOut(false);
+    };
+
+    // Get display name from Supabase user metadata
+    const displayName = user?.user_metadata?.full_name
+        || user?.user_metadata?.name
+        || user?.email?.split('@')[0]
+        || 'Officer';
+
+    // Get avatar URL from Supabase user metadata (Google provides this)
+    const avatarUrl = user?.user_metadata?.avatar_url
+        || user?.user_metadata?.picture;
+
+    // Generate initials for fallback avatar
+    const initials = displayName
+        .split(' ')
+        .map((n: string) => n[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2);
 
     return (
         <aside className="w-64 h-screen border-r-4 border-black bg-white flex flex-col fixed left-0 top-0 z-50">
@@ -60,18 +86,44 @@ export default function Sidebar() {
             </nav>
 
             <div className="p-4 bg-gray-50 border-t-4 border-black">
-                {isLoggedIn && user ? (
+                {isLoading ? (
+                    /* Auth loading skeleton */
+                    <div className="flex items-center gap-3 animate-pulse">
+                        <div className="w-12 h-12 border-4 border-gray-300 bg-gray-200 flex-shrink-0" />
+                        <div className="flex flex-col gap-1">
+                            <div className="h-3 w-20 bg-gray-200 rounded" />
+                            <div className="h-2 w-14 bg-gray-200 rounded" />
+                        </div>
+                    </div>
+                ) : isLoggedIn && user ? (
                     <div className="flex items-center gap-3">
                         <div className="w-12 h-12 border-4 border-black bg-neon-green flex-shrink-0 relative overflow-hidden shadow-brutal-sm">
-                            <img src={user.image} alt={user.name} className="w-full h-full object-cover" />
+                            {avatarUrl ? (
+                                <img src={avatarUrl} alt={displayName} className="w-full h-full object-cover" />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center font-black text-sm">
+                                    {initials}
+                                </div>
+                            )}
                         </div>
-                        <div className="flex flex-col">
-                            <span className="text-sm font-black uppercase tracking-tight leading-none truncate w-32">{user.name}</span>
+                        <div className="flex flex-col min-w-0">
+                            <span className="text-sm font-black uppercase tracking-tight leading-none truncate w-32">
+                                {displayName}
+                            </span>
+                            <span className="text-[9px] font-medium text-gray-400 truncate w-32 mt-0.5">
+                                {user.email}
+                            </span>
                             <button
-                                onClick={logout}
-                                className="text-[10px] font-bold uppercase text-gray-500 hover:text-neon-orange transition-colors flex items-center gap-1 mt-1"
+                                onClick={handleSignOut}
+                                disabled={isSigningOut}
+                                className="text-[10px] font-bold uppercase text-gray-500 hover:text-neon-orange transition-colors flex items-center gap-1 mt-1 disabled:opacity-50"
                             >
-                                <LogOut size={10} /> Log Out
+                                {isSigningOut ? (
+                                    <Loader2 size={10} className="animate-spin" />
+                                ) : (
+                                    <LogOut size={10} />
+                                )}
+                                Log Out
                             </button>
                         </div>
                     </div>

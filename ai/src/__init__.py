@@ -1,1 +1,0 @@
-# Nagarik AI Pipeline

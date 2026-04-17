@@ -7,7 +7,7 @@ Citizens photograph issues → AI classifies & routes → Officers dispatch → 
 ## Architecture
 - **app/** → React Native (Expo) — public citizen app (issue reporting)
 - **website/** → Next.js 14 — government officer dashboard
-- **ai/** → Python FastAPI AI classification pipeline
+- **ml/** → Python FastAPI ML classification pipeline
 - **supabase/** → Postgres + PostGIS + Edge Functions
 
 ## Data Flow

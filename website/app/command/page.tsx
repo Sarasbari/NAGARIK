@@ -126,17 +126,30 @@ export default function CommandPage() {
         const fetch_ = async () => {
             const supabase = createClient();
             const { data, error } = await supabase
-                .from('complaints')
-                .select('id, category, title, description, area, city, latitude, longitude, upvotes, status, submitted_at')
-                .eq('status', 'Pending')
+                .from('reports')
+                .select('id, issue_type, ward, latitude, longitude, status, created_at, severity, ai_confidence')
+                .in('status', ['submitted', 'pending', 'Pending'])
                 .not('latitude', 'is', null)
                 .not('longitude', 'is', null)
-                .order('upvotes', { ascending: false });
-            if (!error) {
-                setComplaints(data || []);
-                // Auto-select first city
-                if (data && data.length > 0) {
-                    const cities = Array.from(new Set(data.map(c => c.city)));
+                .order('created_at', { ascending: false });
+            if (!error && data) {
+                // Map the new table structure back to the component's Complaint interface for now pending refactor
+                const mappedData: Complaint[] = data.map(r => ({
+                    id: r.id,
+                    category: r.issue_type,
+                    title: r.issue_type,
+                    description: `Confidence: ${r.ai_confidence ? (r.ai_confidence * 100).toFixed(0) + '%' : 'N/A'}. Severity: ${r.severity}`,
+                    area: r.ward || 'Unknown Ward',
+                    city: 'Mumbai', // Hardcoded fallback for now
+                    latitude: r.latitude,
+                    longitude: r.longitude,
+                    upvotes: r.severity * 10,
+                    status: 'Pending',
+                    submitted_at: r.created_at
+                }));
+                setComplaints(mappedData);
+                if (mappedData.length > 0) {
+                    const cities = Array.from(new Set(mappedData.map(c => c.city)));
                     setSelectedCity(cities[0]);
                 }
             }

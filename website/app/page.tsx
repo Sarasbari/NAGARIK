@@ -6,8 +6,7 @@ import dynamic from 'next/dynamic';
 import {
   AlertTriangle,
   Droplets,
-  Trash2,
-  Timer
+  Trash2
 } from 'lucide-react';
 
 // Dynamically import map to avoid SSR issues with Leaflet
@@ -26,7 +25,7 @@ export default function Home() {
         <main className="flex-1 p-8 bg-dot-grid">
           <div className="max-w-[1600px] mx-auto space-y-8">
             {/* Stat Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <StatCard
                 title="Active Potholes"
                 value="1,402"
@@ -34,6 +33,7 @@ export default function Home() {
                 trendLabel="Since 00:00"
                 icon={AlertTriangle}
                 iconColor="text-neon-orange"
+                href="/potholes"
               />
               <StatCard
                 title="Water Leaks"
@@ -42,6 +42,7 @@ export default function Home() {
                 trendLabel="Contained"
                 icon={Droplets}
                 iconColor="text-blue-500"
+                href="/water-leaks"
               />
               <StatCard
                 title="Overflowing Bins"
@@ -50,14 +51,7 @@ export default function Home() {
                 trendLabel="Collection Phase"
                 icon={Trash2}
                 iconColor="text-neon-orange"
-              />
-              <StatCard
-                title="Avg Response"
-                value="14.2m"
-                trend="-2.4m"
-                trendLabel="Vs Weekly Avg"
-                icon={Timer}
-                iconColor="text-neon-green"
+                href="/bins"
               />
             </div>
 

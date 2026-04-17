@@ -25,6 +25,13 @@
   .border-3 {
     border-width: 3px;
   }
+  .border-4 {
+    border-width: 4px;
+  }
+  .bg-dot-grid {
+    background-image: radial-gradient(#000000 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
 }
 
 /* ─── Animations ─── */

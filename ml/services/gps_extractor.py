@@ -29,6 +29,10 @@ def extract_gps(image_path: str) -> Tuple[Optional[float], Optional[float]]:
         # Apply N/S and E/W references
         lat_ref = gps_info.get(1)
         lng_ref = gps_info.get(3)
+        if isinstance(lat_ref, bytes):
+            lat_ref = lat_ref.decode(errors="ignore")
+        if isinstance(lng_ref, bytes):
+            lng_ref = lng_ref.decode(errors="ignore")
         
         if lat_ref == 'S':
             lat = -lat

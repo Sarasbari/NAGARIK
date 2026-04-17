@@ -2,6 +2,7 @@ import numpy as np
 import piexif
 from PIL import Image, ImageChops, ImageEnhance
 import io
+from typing import Tuple
 
 def check_exif_authentic(image_path: str) -> dict:
     """AI-generated images almost never have real camera EXIF."""

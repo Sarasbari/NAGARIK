@@ -14,7 +14,7 @@ async def analyze(file: UploadFile = File(...)):
     try:
         # GPS from EXIF (Gemini can't read raw EXIF bytes)
         gps = extract_gps(path)
-        if not gps:
+        if gps[0] is None or gps[1] is None:
             return {"accepted": False, "reason": "no_gps_in_image"}
 
         # Gemini does everything else

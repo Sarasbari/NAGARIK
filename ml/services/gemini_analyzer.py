@@ -3,7 +3,7 @@ import json, re, os
 from PIL import Image
 
 genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-model = genai.GenerativeModel("gemini-1.5-flash")
+model = genai.GenerativeModel("gemini-2.5-flash")
 
 ANALYSIS_PROMPT = """
 You are an AI classifier for NAGARIK, a civic infrastructure reporting system in India.

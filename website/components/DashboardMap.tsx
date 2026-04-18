@@ -1,431 +1,244 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
-import {
-    MapContainer,
-    TileLayer,
-    Marker,
-    Popup,
-    ZoomControl,
-    CircleMarker,
-    Polygon,
-    Tooltip,
-} from 'react-leaflet';
+import React, { useEffect, useState, useCallback } from 'react';
+import { MapContainer, TileLayer, CircleMarker, Popup, ZoomControl } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import {
-    AlertCircle,
-    Layers,
-    Satellite,
-    Map as MapIcon,
-    Eye,
-    EyeOff,
-    Filter,
-    CircleDot,
-    ThumbsUp,
-    Clock,
-} from 'lucide-react';
-import { createClient } from '@/utils/supabase/client';
+import { AlertCircle } from 'lucide-react';
+import { createBrowserSupabaseClient } from '@/lib/supabase';
 
-// ─── Types ──────────────────────────────────────────────────────────
+// Fix for default leaflet icons
+const DefaultIcon = L.icon({
+    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+});
+L.Marker.prototype.options.icon = DefaultIcon;
 
-interface Complaint {
+interface Report {
     id: string;
-    category: string;
-    title: string;
-    description: string;
-    area: string;
-    city: string;
-    state: string;
+    issue_type: string;
+    severity: number;
+    status: string;
+    photo_url: string | null;
     latitude: number;
     longitude: number;
-    status: string;
-    upvotes: number;
-    submitted_at: string;
+    ai_confidence: number | null;
+    created_at: string;
+    ward: string | null;
 }
 
-// ─── Category Mapping ───────────────────────────────────────────────
-
-const CATEGORY_MAP: Record<string, string> = {
-    'Road Pothole': 'pothole',
-    'Water Leak': 'water_leak',
-    'Drainage Blocking': 'drainage',
-    'Overflowing Garbage': 'garbage',
-};
-
-const CATEGORY_COLORS: Record<string, { bg: string; glow: string; label: string }> = {
-    pothole:    { bg: '#ef4444', glow: '#ef444480', label: 'Pothole' },
-    water_leak: { bg: '#3b82f6', glow: '#3b82f680', label: 'Water Leak' },
-    drainage:   { bg: '#06b6d4', glow: '#06b6d480', label: 'Drainage' },
-    garbage:    { bg: '#a855f7', glow: '#a855f780', label: 'Garbage' },
-};
-
-// ─── Custom Marker Icons ────────────────────────────────────────────
-
-const issueIcon = (type: string, upvotes: number) => {
-    const color = CATEGORY_COLORS[type] || CATEGORY_COLORS.pothole;
-    // Scale marker based on upvotes
-    const size = upvotes >= 60 ? 18 : upvotes >= 40 ? 14 : 11;
-    const pulse = upvotes >= 60 ? `
-        <div style="
-            position: absolute; top: 50%; left: 50%;
-            width: ${size + 14}px; height: ${size + 14}px;
-            transform: translate(-50%, -50%);
-            border-radius: 50%;
-            border: 2px solid ${color.bg};
-            opacity: 0.4;
-            animation: pulse-ring 2s ease-out infinite;
-        "></div>` : '';
-
-    return L.divIcon({
-        className: '',
-        html: `
-            <div style="position:relative; width:${size + 16}px; height:${size + 16}px;">
-                ${pulse}
-                <div style="
-                    position: absolute; top: 50%; left: 50%;
-                    width: ${size}px; height: ${size}px;
-                    transform: translate(-50%, -50%);
-                    border-radius: 50%;
-                    background: ${color.bg};
-                    border: 2px solid rgba(255,255,255,0.9);
-                    box-shadow: 0 0 ${upvotes >= 60 ? 12 : 6}px ${color.glow}, 0 2px 4px rgba(0,0,0,0.3);
-                "></div>
-            </div>`,
-        iconSize: [size + 16, size + 16],
-        iconAnchor: [(size + 16) / 2, (size + 16) / 2],
-    });
-};
-
-// ─── Tile Layers ────────────────────────────────────────────────────
-
-const TILE_LAYERS = {
-    satellite: {
-        url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-        attribution: '&copy; Esri, Maxar, Earthstar Geographics',
-        label: 'Satellite',
-    },
-    hybrid: {
-        url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-        attribution: '&copy; Esri &copy; OSM',
-        label: 'Hybrid',
-    },
-    dark: {
-        url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-        attribution: '&copy; OSM &copy; CARTO',
-        label: 'Dark',
-    },
-    light: {
-        url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-        attribution: '&copy; OSM &copy; CARTO',
-        label: 'Light',
-    },
-};
-
-const LABELS_URL = 'https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png';
-
-const STATUS_BADGES: Record<string, { label: string; class: string }> = {
-    'Pending':  { label: 'Pending',  class: 'bg-yellow-100 text-yellow-700' },
-    'Resolved': { label: 'Resolved', class: 'bg-green-100 text-green-700' },
-    'Rejected': { label: 'Rejected', class: 'bg-red-100 text-red-700' },
-};
-
-// ─── Pulse animation ────────────────────────────────────────────────
-
-const PulseStyle = () => (
-    <style>{`
-        @keyframes pulse-ring {
-            0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0.6; }
-            100% { transform: translate(-50%, -50%) scale(1.6); opacity: 0; }
-        }
-    `}</style>
-);
-
-// ─── Helper ─────────────────────────────────────────────────────────
-
-function timeAgo(dateStr: string): string {
-    const diff = Date.now() - new Date(dateStr).getTime();
-    const days = Math.floor(diff / 86400000);
-    if (days > 0) return `${days}d ago`;
-    const hours = Math.floor(diff / 3600000);
-    if (hours > 0) return `${hours}h ago`;
-    const mins = Math.floor(diff / 60000);
-    return `${mins}m ago`;
+function getSeverityColor(severity: number): string {
+    if (severity >= 5) return '#ef4444';       // red
+    if (severity >= 3) return '#f97316';       // orange
+    return '#22c55e';                          // green
 }
 
-// ─── Component ──────────────────────────────────────────────────────
-
-type TileMode = keyof typeof TILE_LAYERS;
-type IssueType = string;
+function getSeverityRadius(severity: number): number {
+    return 6 + severity * 2; // 8 to 16px
+}
 
 export default function DashboardMap() {
-    const center: [number, number] = [22.5, 78.9];
-    const [tileMode, setTileMode] = useState<TileMode>('satellite');
-    const [activeFilters, setActiveFilters] = useState<Set<IssueType>>(new Set(Object.keys(CATEGORY_COLORS)));
-    const [showHeatZones, setShowHeatZones] = useState(true);
-    const [showOverlayPanel, setShowOverlayPanel] = useState(true);
-    const [complaints, setComplaints] = useState<Complaint[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const [reports, setReports] = useState<Report[]>([]);
+    const [selectedReport, setSelectedReport] = useState<Report | null>(null);
+    const center: [number, number] = [19.0760, 72.8777]; // Mumbai center
 
-    // Fetch complaints from Supabase
-    useEffect(() => {
-        const fetchComplaints = async () => {
-            const supabase = createClient();
-            const { data, error } = await supabase
-                .from('complaints')
-                .select('id, category, title, description, area, city, state, latitude, longitude, status, upvotes, submitted_at')
-                .not('latitude', 'is', null)
-                .not('longitude', 'is', null);
+    const fetchReports = useCallback(async () => {
+        const supabase = createBrowserSupabaseClient();
+        const { data, error } = await supabase
+            .from('reports')
+            .select('*')
+            .order('created_at', { ascending: false });
 
-            if (error) {
-                console.error('Error fetching complaints:', error.message);
-            } else {
-                setComplaints(data || []);
-            }
-            setIsLoading(false);
-        };
-
-        fetchComplaints();
+        if (error) {
+            console.error('[DashboardMap] fetch error:', error);
+            return;
+        }
+        if (data) setReports(data);
     }, []);
 
-    const currentTile = TILE_LAYERS[tileMode];
+    useEffect(() => {
+        fetchReports();
 
-    const toggleFilter = (type: IssueType) => {
-        setActiveFilters(prev => {
-            const next = new Set(prev);
-            if (next.has(type)) next.delete(type);
-            else next.add(type);
-            return next;
-        });
-    };
+        // Realtime subscription: new reports appear instantly
+        const supabase = createBrowserSupabaseClient();
+        const channel = supabase
+            .channel('reports-realtime')
+            .on(
+                'postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'reports' },
+                (payload) => {
+                    const newReport = payload.new as Report;
+                    setReports((prev) => [newReport, ...prev]);
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: 'UPDATE', schema: 'public', table: 'reports' },
+                (payload) => {
+                    const updated = payload.new as Report;
+                    setReports((prev) =>
+                        prev.map((r) => (r.id === updated.id ? updated : r))
+                    );
+                }
+            )
+            .subscribe();
 
-    const filteredComplaints = useMemo(
-        () => complaints.filter(c => {
-            const mappedType = CATEGORY_MAP[c.category] || 'pothole';
-            return activeFilters.has(mappedType);
-        }),
-        [activeFilters, complaints]
-    );
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [fetchReports]);
 
-    const stats = useMemo(() => ({
-        total: filteredComplaints.length,
-        critical: filteredComplaints.filter(c => c.upvotes >= 50).length,
-        pending: filteredComplaints.filter(c => c.status === 'Pending').length,
-    }), [filteredComplaints]);
+    const openCount = reports.filter((r) => r.status !== 'resolved').length;
+    const criticalCount = reports.filter((r) => r.severity === 5).length;
 
     return (
-        <div className="flex-1 bg-black border-4 border-black relative overflow-hidden shadow-brutal min-h-[600px]">
-            <PulseStyle />
-
-            {/* Loading overlay */}
-            {isLoading && (
-                <div className="absolute inset-0 z-[2000] bg-black/80 flex items-center justify-center">
-                    <div className="flex items-center gap-3">
-                        <div className="w-5 h-5 border-2 border-white border-t-transparent animate-spin rounded-full" />
-                        <span className="text-white text-xs font-black uppercase tracking-widest">Loading live data...</span>
-                    </div>
-                </div>
-            )}
-
+        <div className="flex-1 bg-white border-4 border-black relative overflow-hidden shadow-brutal min-h-[600px]">
             <MapContainer
                 center={center}
-                zoom={5}
+                zoom={12}
                 scrollWheelZoom={true}
                 className="h-full w-full"
                 zoomControl={false}
-                style={{ background: '#0a0a0a' }}
             >
-                {/* Base tile layer */}
-                <TileLayer attribution={currentTile.attribution} url={currentTile.url} />
+                <TileLayer
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+                    url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                />
 
-                {/* Hybrid labels overlay */}
-                {tileMode === 'hybrid' && (
-                    <TileLayer url={LABELS_URL} attribution="&copy; CARTO" />
-                )}
+                <ZoomControl position="topright" />
 
-                <ZoomControl position="bottomright" />
-
-                {/* ── Overlay: Heat zones ──────────────────────────── */}
-                {showHeatZones && filteredComplaints.map(c => {
-                    const mappedType = CATEGORY_MAP[c.category] || 'pothole';
-                    const colors = CATEGORY_COLORS[mappedType] || CATEGORY_COLORS.pothole;
-                    const radius = Math.max(20, Math.min(c.upvotes * 0.8, 60));
+                {/* Severity-colored markers for each report */}
+                {reports.map((report) => {
+                    if (!report.latitude || !report.longitude) return null;
+                    const color = getSeverityColor(report.severity);
                     return (
                         <CircleMarker
-                            key={`heat-${c.id}`}
-                            center={[c.latitude, c.longitude]}
-                            radius={radius}
+                            key={report.id}
+                            center={[report.latitude, report.longitude]}
+                            radius={getSeverityRadius(report.severity)}
                             pathOptions={{
-                                fillColor: colors.bg,
-                                fillOpacity: 0.12,
-                                stroke: true,
-                                color: colors.bg,
-                                weight: 1,
-                                opacity: 0.25,
+                                fillColor: color,
+                                fillOpacity: 0.8,
+                                color: '#000',
+                                weight: 2,
                             }}
-                        />
-                    );
-                })}
-
-                {/* ── Issue Markers ────────────────────────────────── */}
-                {filteredComplaints.map(c => {
-                    const mappedType = CATEGORY_MAP[c.category] || 'pothole';
-                    const cat = CATEGORY_COLORS[mappedType] || CATEGORY_COLORS.pothole;
-                    const badge = STATUS_BADGES[c.status] || STATUS_BADGES['Pending'];
-                    return (
-                        <Marker
-                            key={c.id}
-                            position={[c.latitude, c.longitude]}
-                            icon={issueIcon(mappedType, c.upvotes)}
+                            eventHandlers={{
+                                click: () => setSelectedReport(report),
+                            }}
                         >
-                            <Popup className="leaflet-popup-custom">
-                                <div className="font-sans w-60">
-                                    <div className="flex items-center justify-between mb-1.5">
-                                        <span className="font-black uppercase text-xs tracking-wide" style={{ color: cat.bg }}>
-                                            {c.category}
-                                        </span>
-                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${badge.class}`}>
-                                            {badge.label}
-                                        </span>
-                                    </div>
-                                    <p className="text-[11px] font-bold text-gray-800 mb-1 leading-tight">{c.title}</p>
-                                    <p className="text-gray-500 text-[10px] mb-2">{c.area}, {c.city}</p>
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-1.5">
-                                            <ThumbsUp size={10} className="text-gray-400" />
-                                            <span className="text-[9px] font-bold text-gray-500">{c.upvotes} upvotes</span>
-                                        </div>
-                                        <div className="flex items-center gap-1">
-                                            <Clock size={10} className="text-gray-400" />
-                                            <span className="text-[9px] text-gray-400">{timeAgo(c.submitted_at)}</span>
-                                        </div>
-                                    </div>
+                            <Popup>
+                                <div className="font-bold text-sm">
+                                    {report.issue_type} — Severity {report.severity}/5
                                 </div>
                             </Popup>
-                        </Marker>
+                        </CircleMarker>
                     );
                 })}
 
-                {/* ── Map Controls: Tile Switcher ─────────────────── */}
-                <div className="absolute top-4 left-4 z-[1000] flex flex-col gap-0.5 bg-black/80 backdrop-blur-md border border-white/10 rounded-xl p-1 shadow-2xl">
-                    {(Object.keys(TILE_LAYERS) as TileMode[]).map(mode => {
-                        const icons = { satellite: Satellite, hybrid: Layers, dark: MapIcon, light: CircleDot };
-                        const Icon = icons[mode];
-                        return (
-                            <button
-                                key={mode}
-                                onClick={() => setTileMode(mode)}
-                                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[9px] font-black uppercase tracking-[0.15em] transition-all ${
-                                    tileMode === mode
-                                        ? 'bg-white text-black shadow-md'
-                                        : 'text-white/50 hover:text-white hover:bg-white/5'
-                                }`}
-                            >
-                                <Icon size={11} /> {TILE_LAYERS[mode].label}
-                            </button>
-                        );
-                    })}
-                </div>
-
-                {/* ── Map Controls: Overlays Panel ────────────────── */}
-                <div className="absolute top-4 right-16 z-[1000]">
-                    <button
-                        onClick={() => setShowOverlayPanel(p => !p)}
-                        className="bg-black/80 backdrop-blur-md border border-white/10 rounded-xl p-2.5 text-white/70 hover:text-white transition-all shadow-2xl"
-                    >
-                        <Filter size={14} />
-                    </button>
-
-                    {showOverlayPanel && (
-                        <div className="absolute top-12 right-0 w-56 bg-black/90 backdrop-blur-md border border-white/10 rounded-xl p-3 shadow-2xl space-y-3">
-                            {/* Category filters */}
-                            <div>
-                                <p className="text-[8px] font-black uppercase tracking-[0.2em] text-white/40 mb-2">Issue Types</p>
-                                <div className="grid grid-cols-2 gap-1">
-                                    {Object.entries(CATEGORY_COLORS).map(([type, cfg]) => (
-                                        <button
-                                            key={type}
-                                            onClick={() => toggleFilter(type)}
-                                            className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[8px] font-bold uppercase tracking-wider transition-all ${
-                                                activeFilters.has(type)
-                                                    ? 'bg-white/10 text-white'
-                                                    : 'text-white/30 hover:text-white/50'
-                                            }`}
-                                        >
-                                            <div
-                                                className="w-2 h-2 rounded-full shrink-0"
-                                                style={{
-                                                    background: activeFilters.has(type) ? cfg.bg : '#4b5563',
-                                                    boxShadow: activeFilters.has(type) ? `0 0 6px ${cfg.glow}` : 'none',
-                                                }}
-                                            />
-                                            {cfg.label}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div className="border-t border-white/10" />
-
-                            {/* Overlay toggles */}
-                            <div>
-                                <p className="text-[8px] font-black uppercase tracking-[0.2em] text-white/40 mb-2">Overlays</p>
-                                <div className="space-y-1">
-                                    <button
-                                        onClick={() => setShowHeatZones(p => !p)}
-                                        className={`flex items-center gap-2 w-full px-2 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all ${
-                                            showHeatZones ? 'bg-white/10 text-white' : 'text-white/30 hover:text-white/50'
-                                        }`}
-                                    >
-                                        {showHeatZones ? <Eye size={10} /> : <EyeOff size={10} />}
-                                        Heat Zones
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* ── Stats Overlay ───────────────────────────────── */}
-                <div className="absolute bottom-6 left-6 z-[1000] bg-black/80 backdrop-blur-md text-white border border-white/10 rounded-xl p-4 max-w-xs shadow-2xl">
-                    <div className="flex items-center gap-2 mb-3">
-                        <AlertCircle size={13} className="text-red-400" />
-                        <h4 className="font-black uppercase text-[9px] tracking-[0.2em]">National Overview</h4>
-                        <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse ml-auto" />
-                        <span className="text-[7px] font-bold uppercase text-green-400 tracking-wider">Live</span>
+                {/* Top stats overlay */}
+                <div className="absolute top-4 left-4 z-[1000] flex gap-3">
+                    <div className="bg-black text-white border-2 border-white px-3 py-2">
+                        <span className="text-[10px] font-bold uppercase block text-gray-400">Open Reports</span>
+                        <span className="text-xl font-black">{openCount}</span>
                     </div>
-                    <div className="grid grid-cols-3 gap-3">
-                        <div>
-                            <p className="text-lg font-black">{stats.total}</p>
-                            <p className="text-[8px] uppercase text-white/40 font-bold tracking-wider">Reports</p>
-                        </div>
-                        <div>
-                            <p className="text-lg font-black text-red-400">{stats.critical}</p>
-                            <p className="text-[8px] uppercase text-white/40 font-bold tracking-wider">High Priority</p>
-                        </div>
-                        <div>
-                            <p className="text-lg font-black text-yellow-400">{stats.pending}</p>
-                            <p className="text-[8px] uppercase text-white/40 font-bold tracking-wider">Pending</p>
-                        </div>
+                    <div className="bg-red-600 text-white border-2 border-white px-3 py-2">
+                        <span className="text-[10px] font-bold uppercase block text-red-200">Severity 5</span>
+                        <span className="text-xl font-black">{criticalCount}</span>
                     </div>
                 </div>
 
-                {/* ── Legend ──────────────────────────────────────── */}
-                <div className="absolute bottom-6 right-6 z-[1000] bg-black/80 backdrop-blur-md border border-white/10 rounded-xl p-3 shadow-2xl">
-                    <p className="text-[7px] font-black uppercase tracking-[0.2em] text-white/30 mb-2">Legend</p>
-                    <div className="flex flex-col gap-1.5">
-                        {Object.entries(CATEGORY_COLORS).filter(([type]) => activeFilters.has(type)).map(([type, cfg]) => (
-                            <div key={type} className="flex items-center gap-2">
-                                <div
-                                    className="w-2 h-2 rounded-full shrink-0"
-                                    style={{ background: cfg.bg, boxShadow: `0 0 4px ${cfg.glow}` }}
-                                />
-                                <span className="text-[8px] font-bold uppercase text-white/60 tracking-wider">{cfg.label}</span>
-                            </div>
-                        ))}
+                {/* Legend */}
+                <div className="absolute bottom-6 right-6 z-[1000] bg-neon-green border-4 border-black p-3 flex gap-6">
+                    <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-green-500 rounded-full border border-black" />
+                        <span className="text-[10px] font-black uppercase italic">Low 1-2</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-orange-500 rounded-full border border-black" />
+                        <span className="text-[10px] font-black uppercase italic">Med 3-4</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-red-500 rounded-full border border-black" />
+                        <span className="text-[10px] font-black uppercase italic">Critical 5</span>
                     </div>
                 </div>
             </MapContainer>
+
+            {/* Slide-in panel for selected report */}
+            {selectedReport && (
+                <div className="absolute top-0 right-0 z-[2000] w-[380px] h-full bg-white border-l-4 border-black overflow-y-auto shadow-2xl animate-slide-in">
+                    <div className="p-4 border-b-4 border-black bg-gray-50 flex justify-between items-center">
+                        <h3 className="font-black uppercase text-sm tracking-wider">Issue Details</h3>
+                        <button
+                            onClick={() => setSelectedReport(null)}
+                            className="text-xl font-black hover:text-red-500 transition-colors"
+                        >
+                            ✕
+                        </button>
+                    </div>
+
+                    {selectedReport.photo_url && (
+                        <img
+                            src={selectedReport.photo_url}
+                            alt="Report"
+                            className="w-full h-48 object-cover border-b-4 border-black"
+                        />
+                    )}
+
+                    <div className="p-6 space-y-4">
+                        <div>
+                            <span className="text-[10px] font-bold uppercase text-gray-500 tracking-widest block">Issue Type</span>
+                            <span className="font-black text-lg uppercase">{selectedReport.issue_type}</span>
+                        </div>
+
+                        <div className="flex gap-4">
+                            <div className="flex-1">
+                                <span className="text-[10px] font-bold uppercase text-gray-500 tracking-widest block">Severity</span>
+                                <div className="flex items-center gap-2 mt-1">
+                                    <div
+                                        className="w-4 h-4 rounded-full border-2 border-black"
+                                        style={{ backgroundColor: getSeverityColor(selectedReport.severity) }}
+                                    />
+                                    <span className="font-black text-lg">{selectedReport.severity}/5</span>
+                                </div>
+                            </div>
+                            <div className="flex-1">
+                                <span className="text-[10px] font-bold uppercase text-gray-500 tracking-widest block">Status</span>
+                                <span className="inline-block mt-1 bg-black text-neon-green px-3 py-1 font-bold text-xs uppercase">
+                                    {selectedReport.status}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-4">
+                            <div className="flex-1">
+                                <span className="text-[10px] font-bold uppercase text-gray-500 tracking-widest block">Latitude</span>
+                                <span className="font-mono text-sm">{selectedReport.latitude?.toFixed(6)}</span>
+                            </div>
+                            <div className="flex-1">
+                                <span className="text-[10px] font-bold uppercase text-gray-500 tracking-widest block">Longitude</span>
+                                <span className="font-mono text-sm">{selectedReport.longitude?.toFixed(6)}</span>
+                            </div>
+                        </div>
+
+                        {selectedReport.ai_confidence != null && (
+                            <div>
+                                <span className="text-[10px] font-bold uppercase text-gray-500 tracking-widest block">AI Confidence</span>
+                                <span className="font-black text-lg">{(selectedReport.ai_confidence * 100).toFixed(0)}%</span>
+                            </div>
+                        )}
+
+                        <div>
+                            <span className="text-[10px] font-bold uppercase text-gray-500 tracking-widest block">Reported At</span>
+                            <span className="font-bold text-sm">
+                                {new Date(selectedReport.created_at).toLocaleString('en-IN')}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

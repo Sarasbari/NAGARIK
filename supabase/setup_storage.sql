@@ -1,10 +1,23 @@
--- Create the 'incident-images' bucket
-INSERT INTO storage.buckets (id, name, public) 
-VALUES ('incident-images', 'incident-images', true)
+-- setup_storage.sql
+-- Run this in the Supabase SQL Editor to create the report-images bucket
+-- and open storage policies for hackathon.
+
+-- 1. Create the bucket
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('report-images', 'report-images', true)
 ON CONFLICT (id) DO NOTHING;
 
--- Policy to allow anyone to select/view the images (public)
-CREATE POLICY "Public Access" ON storage.objects FOR SELECT USING (bucket_id = 'incident-images');
+-- 2. Allow anyone to upload images
+CREATE POLICY "Anyone can upload report images"
+  ON storage.objects FOR INSERT
+  WITH CHECK (bucket_id = 'report-images');
 
--- Policy to allow authenticated citizens to insert/upload images
-CREATE POLICY "Auth Insert" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'incident-images' AND auth.role() = 'authenticated');
+-- 3. Allow anyone to read images (public bucket)
+CREATE POLICY "Anyone can view report images"
+  ON storage.objects FOR SELECT
+  USING (bucket_id = 'report-images');
+
+-- 4. Allow anyone to delete their uploads (for rejected images)
+CREATE POLICY "Anyone can delete report images"
+  ON storage.objects FOR DELETE
+  USING (bucket_id = 'report-images');

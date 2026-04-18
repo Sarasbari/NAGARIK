@@ -1,42 +1,48 @@
-from fastapi import APIRouter, UploadFile, File
-import tempfile, os, shutil
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 from services.gemini_analyzer import analyze_image
-from services.gps_extractor import extract_gps   # still needed for lat/lng
 
 router = APIRouter()
 
-@router.post("/")
-async def analyze(file: UploadFile = File(...)):
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
-        shutil.copyfileobj(file.file, tmp)
-        path = tmp.name
 
+class AnalyzeRequest(BaseModel):
+    image_url: str
+    description: str = ""
+    category: str
+    latitude: float
+    longitude: float
+
+
+class AnalyzeResponse(BaseModel):
+    accepted: bool
+    severity: int | None = None
+    reason: str | None = None
+
+
+@router.post("/analyze", response_model=AnalyzeResponse)
+async def analyze(request: AnalyzeRequest):
+    """
+    Receives image_url + metadata. Downloads image, runs Gemini vision analysis,
+    returns accept/reject with severity.
+    """
     try:
-        # GPS from EXIF (Gemini can't read raw EXIF bytes)
-        gps = extract_gps(path)
-        if gps[0] is None or gps[1] is None:
-            return {"accepted": False, "reason": "no_gps_in_image"}
+        result = await analyze_image(
+            image_url=request.image_url,
+            category=request.category,
+        )
 
-        # Gemini does everything else
-        result = analyze_image(path)
+        if result["is_real_photo"] and result["matches_category"]:
+            return AnalyzeResponse(
+                accepted=True,
+                severity=result["severity"],
+            )
+        else:
+            return AnalyzeResponse(
+                accepted=False,
+                reason=result.get("rejection_reason", "unknown"),
+            )
 
-        if not result["is_real_photo"]:
-            return {"accepted": False, "reason": "fake_or_edited_image"}
-
-        if not result["is_road_issue"]:
-            return {"accepted": False, "reason": result.get("rejection_reason", "not_road")}
-
-        if result["confidence"] < 0.5:
-            return {"accepted": False, "reason": "low_confidence"}
-
-        return {
-            "accepted": True,
-            "category": result["category"],
-            "severity": result["severity"],
-            "confidence": result["confidence"],
-            "latitude": gps[0],
-            "longitude": gps[1]
-        }
-
-    finally:
-        os.unlink(path)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")

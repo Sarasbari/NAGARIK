@@ -1,44 +1,71 @@
+import json
+import os
+import httpx
 import google.generativeai as genai
-import json, re, os
 from PIL import Image
+from io import BytesIO
+from dotenv import load_dotenv
 
-genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-model = genai.GenerativeModel("gemini-2.5-flash")
+load_dotenv()
 
-ANALYSIS_PROMPT = """
-You are an AI classifier for NAGARIK, a civic infrastructure reporting system in India.
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+genai.configure(api_key=GEMINI_API_KEY)
+model = genai.GenerativeModel("gemini-1.5-flash")
 
-Analyze this image and respond with ONLY a JSON object — no explanation, no markdown.
+SYSTEM_PROMPT = """You are a civic infrastructure image verifier for India.
+Analyze the image and respond ONLY with this JSON — no markdown, no explanation:
+{{
+  "is_real_photo": bool,
+  "matches_category": bool,
+  "severity": 1-5,
+  "rejection_reason": null | "fake_image" | "wrong_category" | "unclear_image"
+}}
 
-{
-  "is_real_photo": true or false,       // false if AI-generated, heavily edited, screenshot, or clearly fake
-  "is_road_issue": true or false,       // true only if the image clearly shows a road surface
-  "category": "pothole" | "road_decay" | "other",
-  "severity": 1 to 5,                  // 1=minor crack, 5=large dangerous pothole. 0 if not a road issue
-  "confidence": 0.0 to 1.0,
-  "rejection_reason": null | "not_road" | "fake_image" | "unclear_image"
-}
+Rules:
+- is_real_photo: false if AI-generated, screenshot, meme, selfie, not a photo of infrastructure
+- matches_category: does image match the submitted category?
+- severity: 1=minor cosmetic, 2=noticeable, 3=moderate, 4=serious, 5=critical/dangerous. Set 0 if not accepted.
+- rejection_reason: null if accepted, otherwise one of the three reasons
 
-Severity guide:
-- 1: Hairline cracks, minor surface wear
-- 2: Visible cracks, small patches of damage
-- 3: Moderate pothole or significant road decay
-- 4: Large pothole, dangerous road surface
-- 5: Severe damage, immediate safety hazard
-"""
+Category submitted: {category}"""
 
-def analyze_image(image_path: str) -> dict:
-    with open(image_path, "rb") as f:
-        image_bytes = f.read()
 
-    response = model.generate_content([
-        {"mime_type": "image/jpeg", "data": image_bytes},
-        ANALYSIS_PROMPT
-    ])
+async def analyze_image(image_url: str, category: str) -> dict:
+    """Download image from URL, send to Gemini 1.5 Flash, parse JSON response."""
 
-    # Strip any markdown formatting Gemini might add
-    raw = response.text.strip()
-    raw = re.sub(r"```json|```", "", raw).strip()
-    
-    result = json.loads(raw)
+    # Download image
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.get(image_url)
+        if resp.status_code != 200:
+            raise ValueError(f"Failed to download image: HTTP {resp.status_code}")
+
+    # Open as PIL Image
+    image_bytes = resp.content
+    pil_image = Image.open(BytesIO(image_bytes))
+
+    # Build prompt
+    prompt = SYSTEM_PROMPT.format(category=category)
+
+    # Call Gemini
+    response = model.generate_content([prompt, pil_image])
+    raw_text = response.text.strip()
+
+    # Strip markdown fences if present
+    if raw_text.startswith("```"):
+        lines = raw_text.split("\n")
+        lines = [l for l in lines if not l.startswith("```")]
+        raw_text = "\n".join(lines).strip()
+
+    # Parse JSON
+    try:
+        result = json.loads(raw_text)
+    except json.JSONDecodeError:
+        raise ValueError(f"Gemini returned invalid JSON: {raw_text[:200]}")
+
+    # Validate required fields
+    required = ["is_real_photo", "matches_category", "severity", "rejection_reason"]
+    for field in required:
+        if field not in result:
+            raise ValueError(f"Missing field '{field}' in Gemini response")
+
     return result

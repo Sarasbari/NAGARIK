@@ -164,7 +164,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ reports }, { status: 200 });
+    return NextResponse.json(reports || [], { status: 200 });
 
   } catch (err: any) {
     console.error('[GET /api/reports] Unhandled error:', err);

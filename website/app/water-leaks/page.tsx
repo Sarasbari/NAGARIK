@@ -20,6 +20,8 @@ interface Complaint {
     submitted_at: string;
     landmark: string;
     category: string;
+    latitude: number;
+    longitude: number;
 }
 
 function timeAgo(dateStr: string): string {

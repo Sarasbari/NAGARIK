@@ -19,6 +19,8 @@ interface Complaint {
     image_url: string;
     submitted_at: string;
     landmark: string;
+    latitude: number;
+    longitude: number;
 }
 
 function timeAgo(dateStr: string): string {

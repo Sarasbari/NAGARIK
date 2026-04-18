@@ -1,9 +1,12 @@
 import type { Metadata } from 'next';
 import './globals.css';
-import KPIStrip from '../components/ui/KPIStrip';
+
+import { AuthProvider } from '@/contexts/AuthContext';
+import { LocationProvider } from '@/contexts/LocationContext';
+import DashboardLayout from '@/components/DashboardLayout';
 
 export const metadata: Metadata = {
-  title: 'Nagarik Dashboard — Municipal Command Center',
+  title: 'Nagarik',
   description: 'AI-powered civic issue tracking and dispatch system for municipal officers.',
 };
 
@@ -21,9 +24,12 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="font-body bg-brutal-bg text-brutal-border min-h-screen">
-        <KPIStrip />
-        <main className="h-[calc(100vh-64px)]">{children}</main>
+      <body className="font-body bg-white text-black min-h-screen">
+        <LocationProvider>
+          <AuthProvider>
+            <DashboardLayout>{children}</DashboardLayout>
+          </AuthProvider>
+        </LocationProvider>
       </body>
     </html>
   );

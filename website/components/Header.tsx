@@ -9,29 +9,13 @@ interface HeaderProps {
     title?: string;
 }
 
-const CITIES = [
-    'All',
-    'Ahmedabad',
-    'Bangalore',
-    'Chennai',
-    'Delhi',
-    'Gurgaon',
-    'Hyderabad',
-    'Jaipur',
-    'Kolkata',
-    'Mumbai',
-    'Pune',
-    'Shimla',
-    'Surat'
-];
-
 export default function Header({ title = 'City_Command_Center' }: HeaderProps) {
     const { user, isLoggedIn } = useAuth();
-    const { selectedCity, setCity } = useLocation();
+    const { selectedCity, setCity, cities } = useLocation();
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
 
-    const filteredCities = CITIES.filter(city =>
+    const filteredCities = cities.filter((city: string) =>
         city.toLowerCase().includes(searchTerm.toLowerCase())
     );
 

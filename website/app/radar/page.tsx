@@ -11,8 +11,6 @@ import {
 } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import Sidebar from '@/components/Sidebar';
-import Header from '@/components/Header';
 import { createClient } from '@/utils/supabase/client';
 import { heatWeight } from '@/utils/routeOptimizer';
 import {
@@ -168,11 +166,7 @@ export default function RadarPage() {
     }, []);
 
     return (
-        <div className="min-h-screen bg-white">
-            <Sidebar />
-            <div className="ml-64 flex flex-col min-h-screen">
-                <Header title="RADAR — PREDICTIVE AI" />
-
+        <>
                 <main className="flex-1 p-8 bg-dot-grid">
                     <div className="max-w-[1600px] mx-auto space-y-6">
 
@@ -409,7 +403,6 @@ export default function RadarPage() {
                         </div>
                     </div>
                 </main>
-            </div>
-        </div>
+        </>
     );
 }

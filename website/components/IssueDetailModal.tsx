@@ -18,11 +18,69 @@ interface IssueDetailModalProps {
         reporterName?: string;
         reporterRole?: string;
         reporterDistrict?: string;
+        category?: string;
         stats?: { label: string; value: string; color?: string }[];
+        acceptedAt?: number;
     } | null;
+    isAcceptedView?: boolean;
 }
 
-export default function IssueDetailModal({ isOpen, onClose, issue }: IssueDetailModalProps) {
+export default function IssueDetailModal({ isOpen, onClose, issue, isAcceptedView }: IssueDetailModalProps) {
+    const [timeLeft, setTimeLeft] = React.useState<string>('--:--:--');
+
+    React.useEffect(() => {
+        if (!isOpen || !isAcceptedView || !issue) return;
+
+        let slaHours = 120;
+        const matchStr = `${issue.category || ''} ${issue.title || ''} ${issue.description || ''}`.toLowerCase();
+        if (matchStr.includes('garbage') || matchStr.includes('bin') || matchStr.includes('trash')) slaHours = 48;
+        else if (matchStr.includes('drain') || matchStr.includes('water leak')) slaHours = 72;
+        else if (matchStr.includes('pothole')) slaHours = 192;
+
+        const acceptedAt = issue.acceptedAt || Date.now();
+        const targetTime = acceptedAt + (slaHours * 60 * 60 * 1000);
+
+        const updateTimer = () => {
+            const now = Date.now();
+            const diff = targetTime - now;
+
+            if (diff <= 0) {
+                setTimeLeft('00:00:00 - BREACHED');
+                return;
+            }
+
+            const h = Math.floor(diff / (1000 * 60 * 60));
+            const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            const s = Math.floor((diff % (1000 * 60)) / 1000);
+
+            setTimeLeft(
+                `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+            );
+        };
+
+        updateTimer();
+        const intervalId = setInterval(updateTimer, 1000);
+
+        return () => clearInterval(intervalId);
+    }, [isOpen, isAcceptedView, issue]);
+
+    const handleAccept = () => {
+        if (!issue) return;
+        const existing = JSON.parse(localStorage.getItem('acceptedWorks') || '[]');
+        const isAlreadyAccepted = existing.some((w: any) => w.id === issue.id);
+        if (!isAlreadyAccepted) {
+            existing.push({
+                ...issue,
+                id: issue.id || `PTH-${Math.floor(Math.random() * 9000) + 1000}`,
+                date: issue.date || new Date().toLocaleDateString(),
+                acceptedAt: Date.now()
+            });
+            localStorage.setItem('acceptedWorks', JSON.stringify(existing));
+            window.dispatchEvent(new Event('acceptedWorksChanged'));
+        }
+        onClose();
+    };
+
     if (!isOpen || !issue) return null;
 
     const statusColor = issue.status === 'CRITICAL' ? 'bg-neon-orange' :
@@ -160,19 +218,33 @@ export default function IssueDetailModal({ isOpen, onClose, issue }: IssueDetail
                             </div>
                         </div>
 
-                        <div className="p-6 border-t-8 border-black grid grid-cols-2 gap-6 bg-gray-50">
-                            <button
-                                onClick={onClose}
-                                className="flex items-center justify-center gap-2 bg-neon-green border-8 border-black p-4 text-2xl font-black uppercase shadow-brutal hover:translate-x-[-4px] hover:translate-y-[-4px] hover:shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] active:translate-x-0 active:translate-y-0 active:shadow-none transition-all"
-                            >
-                                <Check size={28} /> Accept
-                            </button>
-                            <button
-                                onClick={onClose}
-                                className="flex items-center justify-center gap-2 bg-neon-orange border-8 border-black p-4 text-2xl font-black uppercase shadow-brutal hover:translate-x-[-4px] hover:translate-y-[-4px] hover:shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] active:translate-x-0 active:translate-y-0 active:shadow-none transition-all"
-                            >
-                                <Ban size={28} /> Ignore
-                            </button>
+                        <div className="p-6 border-t-8 border-black flex gap-6 bg-gray-50">
+                            {isAcceptedView ? (
+                                <div className="w-full border-4 border-black bg-neon-orange/10 p-4 flex flex-col justify-center text-center">
+                                    <h4 className="text-[10px] font-black uppercase text-gray-500 tracking-widest mb-1">Mandatory Resolution SLA</h4>
+                                    <div className="text-4xl lg:text-6xl font-black uppercase tracking-tighter text-black font-mono">
+                                        {timeLeft}
+                                    </div>
+                                    <div className="text-xs font-bold text-neon-orange uppercase tracking-widest mt-2 flex items-center justify-center gap-2">
+                                        <div className="w-2 h-2 rounded-full bg-neon-orange animate-pulse" /> Live Countdown
+                                    </div>
+                                </div>
+                            ) : (
+                                <>
+                                    <button
+                                        onClick={handleAccept}
+                                        className="w-1/2 flex items-center justify-center gap-2 bg-neon-green border-8 border-black p-4 text-2xl font-black uppercase shadow-brutal hover:translate-x-[-4px] hover:translate-y-[-4px] hover:shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] active:translate-x-0 active:translate-y-0 active:shadow-none transition-all"
+                                    >
+                                        <Check size={28} /> Accept
+                                    </button>
+                                    <button
+                                        onClick={onClose}
+                                        className="w-1/2 flex items-center justify-center gap-2 bg-neon-orange border-8 border-black p-4 text-2xl font-black uppercase shadow-brutal hover:translate-x-[-4px] hover:translate-y-[-4px] hover:shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] active:translate-x-0 active:translate-y-0 active:shadow-none transition-all"
+                                    >
+                                        <Ban size={28} /> Ignore
+                                    </button>
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>

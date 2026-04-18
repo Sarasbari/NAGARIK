@@ -1,8 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Sidebar from '@/components/Sidebar';
-import Header from '@/components/Header';
+
 import IssueCard from '@/components/IssueCard';
 import IssueDetailModal from '@/components/IssueDetailModal';
 import { useLocation } from '@/contexts/LocationContext';
@@ -79,17 +78,13 @@ export default function BinsPage() {
     ];
 
     return (
-        <div className="min-h-screen bg-white">
+        <>
             <IssueDetailModal
                 isOpen={!!selectedIssue}
                 onClose={() => setSelectedIssue(null)}
                 issue={selectedIssue}
             />
-            <Sidebar />
-            <div className="ml-64 flex flex-col min-h-screen">
-                <Header title="OVERFLOWING BINS" />
-
-                <main className="flex-1 p-8 bg-dot-grid">
+            <main className="flex-1 p-8 bg-dot-grid">
                     <div className="max-w-[1200px] mx-auto space-y-12">
                         {/* Top Stats Grid */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -166,7 +161,6 @@ export default function BinsPage() {
                         </div>
                     </div>
                 </main>
-            </div>
-        </div>
+        </>
     );
 }

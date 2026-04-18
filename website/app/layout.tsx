@@ -3,6 +3,7 @@ import './globals.css';
 
 import { AuthProvider } from '@/contexts/AuthContext';
 import { LocationProvider } from '@/contexts/LocationContext';
+import DashboardLayout from '@/components/DashboardLayout';
 
 export const metadata: Metadata = {
   title: 'Nagarik',
@@ -26,7 +27,7 @@ export default function RootLayout({
       <body className="font-body bg-white text-black min-h-screen">
         <LocationProvider>
           <AuthProvider>
-            <main className="min-h-screen">{children}</main>
+            <DashboardLayout>{children}</DashboardLayout>
           </AuthProvider>
         </LocationProvider>
       </body>

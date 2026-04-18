@@ -13,6 +13,7 @@ import {
     Flame,
     LogOut,
     User,
+    Users,
     Loader2,
     Radar,
     Radio,
@@ -88,6 +89,7 @@ export default function Sidebar() {
                 <div className="border-b-4 border-black border-dashed" />
                 <NavItem icon={Radar} label="Radar AI" href="/radar" />
                 <NavItem icon={Radio} label="Command Center" href="/command" />
+                <NavItem icon={Users} label="Unclaimed Works" href="/unclaimed" />
             </nav>
 
             <div className="p-4 bg-gray-50 border-t-4 border-black">

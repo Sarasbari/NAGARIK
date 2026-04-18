@@ -12,8 +12,6 @@ import {
 } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import Sidebar from '@/components/Sidebar';
-import Header from '@/components/Header';
 import { createClient } from '@/utils/supabase/client';
 import {
     nearestNeighborRoute,
@@ -205,11 +203,7 @@ export default function CommandPage() {
     const etaWithStops = estimateTime(route.totalDistanceKm, route.orderedStops.length);
 
     return (
-        <div className="min-h-screen bg-white">
-            <Sidebar />
-            <div className="ml-64 flex flex-col min-h-screen">
-                <Header title="COMMAND CENTER" />
-
+        <>
                 <main className="flex-1 p-6 bg-dot-grid">
                     <div className="max-w-[1600px] mx-auto">
 
@@ -531,7 +525,6 @@ export default function CommandPage() {
                         </div>
                     </div>
                 </main>
-            </div>
-        </div>
+        </>
     );
 }

@@ -1,7 +1,5 @@
 'use client';
 
-import Sidebar from '@/components/Sidebar';
-import Header from '@/components/Header';
 import { Award, ShieldCheck, Zap } from 'lucide-react';
 import Image from 'next/image';
 
@@ -105,11 +103,7 @@ function FameCard({ hero }: { hero: typeof HEROES[0] }) {
 
 export default function FamesPage() {
     return (
-        <div className="min-h-screen bg-white">
-            <Sidebar />
-            <div className="ml-64 flex flex-col min-h-screen">
-                <Header title="WALL OF FAME" />
-
+        <>
                 <main className="flex-1 p-8 bg-dot-grid">
                     <div className="max-w-[1400px] mx-auto space-y-12">
                         {/* Page Header Area */}
@@ -148,7 +142,6 @@ export default function FamesPage() {
                         </div>
                     </div>
                 </main>
-            </div>
-        </div>
+        </>
     );
 }

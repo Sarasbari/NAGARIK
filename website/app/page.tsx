@@ -1,5 +1,4 @@
-import Sidebar from '@/components/Sidebar';
-import Header from '@/components/Header';
+
 import StatCard from '@/components/StatCard';
 import ControlPanel from '@/components/ControlPanel';
 import dynamic from 'next/dynamic';
@@ -47,11 +46,7 @@ export default async function Home() {
   const pendingCount = totalRes.count ?? 0;
 
   return (
-    <div className="min-h-screen bg-white">
-      <Sidebar />
-      <div className="ml-64 flex flex-col min-h-screen">
-        <Header />
-
+    <>
         <main className="flex-1 p-8 bg-dot-grid">
           <div className="max-w-[1600px] mx-auto space-y-8">
             {/* Stat Grid */}
@@ -92,7 +87,6 @@ export default async function Home() {
             </div>
           </div>
         </main>
-      </div>
-    </div>
+    </>
   );
 }

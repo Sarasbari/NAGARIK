@@ -1,4 +1,5 @@
 'use client';
+import React, { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -17,9 +18,12 @@ const customIcon = L.divIcon({
 });
 
 export default function MiniMap({ lat, lng }: { lat: number, lng: number }) {
+    const [mapId] = useState(() => `mini-map-${Math.random().toString(36).substr(2, 9)}`);
+
     if (!lat || !lng) return null;
     return (
         <MapContainer
+            key={mapId}
             center={[lat, lng]}
             zoom={15}
             scrollWheelZoom={false}

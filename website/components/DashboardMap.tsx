@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { MapContainer, TileLayer, CircleMarker, Popup, ZoomControl } from 'react-leaflet';
+import { MapContainer, TileLayer, CircleMarker, Popup, ZoomControl, LayersControl } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { AlertCircle } from 'lucide-react';
@@ -21,12 +21,12 @@ interface Report {
     issue_type: string;
     severity: number;
     status: string;
-    photo_url: string | null;
+    image_url: string | null;  // Fixed from photo_url based on database schema
     latitude: number;
     longitude: number;
-    ai_confidence: number | null;
+    ml_reason: string | null;  // Fixed from ai_confidence based on database schema
     created_at: string;
-    ward: string | null;
+    category: string | null;   // Fixed from ward
 }
 
 function getSeverityColor(severity: number): string {
@@ -40,6 +40,10 @@ function getSeverityRadius(severity: number): number {
 }
 
 export default function DashboardMap() {
+    // NextJS React 18 strict mode forces DOM recycling. We give this map instance a statically generated
+    // unique key on component mount to force React to physically destroy the DOM node instead of recycling it.
+    const [mapId] = useState(() => `dashboard-map-${Math.random().toString(36).substr(2, 9)}`);
+
     const [reports, setReports] = useState<Report[]>([]);
     const [selectedReport, setSelectedReport] = useState<Report | null>(null);
     const center: [number, number] = [19.0760, 72.8777]; // Mumbai center
@@ -94,20 +98,37 @@ export default function DashboardMap() {
     const criticalCount = reports.filter((r) => r.severity === 5).length;
 
     return (
-        <div className="flex-1 bg-white border-4 border-black relative overflow-hidden shadow-brutal min-h-[600px]">
+        <div className="flex-1 bg-white border-4 border-black relative overflow-hidden shadow-brutal h-full">
             <MapContainer
+                key={mapId}
                 center={center}
                 zoom={12}
                 scrollWheelZoom={true}
-                className="h-full w-full"
+                className="h-full w-full z-0"
                 zoomControl={false}
             >
-                <TileLayer
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-                    url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-                />
+                <LayersControl position="topright">
+                    <LayersControl.BaseLayer name="Dark Map">
+                        <TileLayer
+                            attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>'
+                            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                        />
+                    </LayersControl.BaseLayer>
+                    <LayersControl.BaseLayer name="Street Map (OSM)">
+                        <TileLayer
+                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                        />
+                    </LayersControl.BaseLayer>
+                    <LayersControl.BaseLayer checked name="Satellite View">
+                        <TileLayer
+                            attribution='&copy; <a href="https://www.esri.com/">Esri</a>'
+                            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                        />
+                    </LayersControl.BaseLayer>
+                </LayersControl>
 
-                <ZoomControl position="topright" />
+                <ZoomControl position="bottomright" />
 
                 {/* Severity-colored markers for each report */}
                 {reports.map((report) => {
@@ -179,9 +200,9 @@ export default function DashboardMap() {
                         </button>
                     </div>
 
-                    {selectedReport.photo_url && (
+                    {selectedReport.image_url && (
                         <img
-                            src={selectedReport.photo_url}
+                            src={selectedReport.image_url}
                             alt="Report"
                             className="w-full h-48 object-cover border-b-4 border-black"
                         />
@@ -190,7 +211,7 @@ export default function DashboardMap() {
                     <div className="p-6 space-y-4">
                         <div>
                             <span className="text-[10px] font-bold uppercase text-gray-500 tracking-widest block">Issue Type</span>
-                            <span className="font-black text-lg uppercase">{selectedReport.issue_type}</span>
+                            <span className="font-black text-lg uppercase">{selectedReport.category || selectedReport.issue_type}</span>
                         </div>
 
                         <div className="flex gap-4">
@@ -223,10 +244,10 @@ export default function DashboardMap() {
                             </div>
                         </div>
 
-                        {selectedReport.ai_confidence != null && (
-                            <div>
-                                <span className="text-[10px] font-bold uppercase text-gray-500 tracking-widest block">AI Confidence</span>
-                                <span className="font-black text-lg">{(selectedReport.ai_confidence * 100).toFixed(0)}%</span>
+                        {selectedReport.ml_reason && (
+                            <div className="bg-red-50 border border-red-200 p-2 rounded">
+                                <span className="text-[10px] font-bold uppercase text-red-500 tracking-widest block">ML Rejection Reason</span>
+                                <span className="font-bold text-sm text-red-700">{selectedReport.ml_reason}</span>
                             </div>
                         )}
 

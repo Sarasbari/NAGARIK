@@ -43,24 +43,24 @@ export default function Home() {
     const supabase = createBrowserSupabaseClient();
     const { data: reports, error } = await supabase
       .from('reports')
-      .select('issue_type, status, severity, created_at');
+      .select('category, status, severity, created_at');
 
     if (error || !reports) return;
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const active = reports.filter((r) => r.status !== 'resolved');
-    const potholes = active.filter((r) => r.issue_type === 'pothole').length;
+    const active = reports.filter((r) => r.status?.toLowerCase() !== 'resolved' && r.status?.toLowerCase() !== 'rejected');
+    const potholes = active.filter((r) => r.category === 'Road Pothole').length;
     const waterLeaks = active.filter(
-      (r) => r.issue_type === 'drainage' || r.issue_type === 'water'
+      (r) => r.category === 'Water Leakage'
     ).length;
-    const bins = active.filter((r) => r.issue_type === 'garbage').length;
+    const bins = active.filter((r) => r.category === 'Garbage Accumulation' || r.category === 'Illegal Dump').length;
     const todayNew = reports.filter(
       (r) => new Date(r.created_at) >= today
     ).length;
     const resolvedToday = reports.filter(
-      (r) => r.status === 'resolved' && new Date(r.created_at) >= today
+      (r) => r.status?.toLowerCase() === 'resolved' && new Date(r.created_at) >= today
     ).length;
 
     setStats({
@@ -90,57 +90,50 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white">
-      <Sidebar />
-      <div className="ml-64 flex flex-col min-h-screen">
-        <Header />
+    <main className="flex-1 p-8 bg-dot-grid min-h-screen">
+      <div className="max-w-[1600px] mx-auto space-y-8">
+        {/* Stat Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <StatCard
+            title="Active Issues"
+            value={stats.activePotholes}
+            trend={`+${stats.todayNew}`}
+            trendLabel="Since 00:00"
+            icon={AlertTriangle}
+            iconColor="text-neon-orange"
+          />
+          <StatCard
+            title="Water/Drainage"
+            value={stats.waterLeaks}
+            trend={stats.waterLeaks > 0 ? 'Active' : 'Clear'}
+            trendLabel="Reports"
+            icon={Droplets}
+            iconColor="text-blue-500"
+          />
+          <StatCard
+            title="Garbage Issues"
+            value={stats.overflowingBins}
+            trend={stats.overflowingBins > 0 ? 'Active' : 'Clear'}
+            trendLabel="Reports"
+            icon={Trash2}
+            iconColor="text-neon-orange"
+          />
+          <StatCard
+            title="Resolved Today"
+            value={stats.resolvedToday}
+            trend={stats.resolvedToday > 0 ? `+${stats.resolvedToday}` : '0'}
+            trendLabel="Today"
+            icon={Timer}
+            iconColor="text-neon-green"
+          />
+        </div>
 
-        <main className="flex-1 p-8 bg-dot-grid">
-          <div className="max-w-[1600px] mx-auto space-y-8">
-            {/* Stat Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <StatCard
-                title="Active Issues"
-                value={stats.activePotholes}
-                trend={`+${stats.todayNew}`}
-                trendLabel="Since 00:00"
-                icon={AlertTriangle}
-                iconColor="text-neon-orange"
-              />
-              <StatCard
-                title="Water/Drainage"
-                value={stats.waterLeaks}
-                trend={stats.waterLeaks > 0 ? 'Active' : 'Clear'}
-                trendLabel="Reports"
-                icon={Droplets}
-                iconColor="text-blue-500"
-              />
-              <StatCard
-                title="Garbage Issues"
-                value={stats.overflowingBins}
-                trend={stats.overflowingBins > 0 ? 'Active' : 'Clear'}
-                trendLabel="Reports"
-                icon={Trash2}
-                iconColor="text-neon-orange"
-              />
-              <StatCard
-                title="Resolved Today"
-                value={stats.resolvedToday}
-                trend={stats.resolvedToday > 0 ? `+${stats.resolvedToday}` : '0'}
-                trendLabel="Today"
-                icon={Timer}
-                iconColor="text-neon-green"
-              />
-            </div>
-
-            {/* Dashboard Content */}
-            <div className="flex gap-8">
-              <ControlPanel />
-              <DashboardMap />
-            </div>
-          </div>
-        </main>
+        {/* Dashboard Content */}
+        <div className="flex gap-8 h-[600px] items-stretch">
+          <ControlPanel />
+          <DashboardMap />
+        </div>
       </div>
-    </div>
+    </main>
   );
 }

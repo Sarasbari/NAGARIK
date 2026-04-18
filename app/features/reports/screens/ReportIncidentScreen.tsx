@@ -1,21 +1,18 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Camera, CameraType } from 'expo-camera';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Location from 'expo-location';
 
 export default function ReportIncidentScreen({ navigation }: any) {
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [permission, requestPermission] = useCameraPermissions();
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
   const [gpsReady, setGpsReady] = useState(false);
-  const cameraRef = useRef<Camera | null>(null);
+  const cameraRef = useRef<any>(null);
 
   useEffect(() => {
     (async () => {
-      const { status: camStatus } = await Camera.requestCameraPermissionsAsync();
-      setHasPermission(camStatus === 'granted');
-
-      const { status: locStatus } = await Location.requestForegroundPermissionsAsync();
-      if (locStatus === 'granted') {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status === 'granted') {
         const loc = await Location.getCurrentPositionAsync({});
         setLocation(loc);
         setGpsReady(true);
@@ -33,25 +30,11 @@ export default function ReportIncidentScreen({ navigation }: any) {
     });
   };
 
-  if (hasPermission === null) {
-    return (
-      <View style={styles.permissionContainer}>
-        <Text style={styles.permissionText}>Requesting camera access...</Text>
-      </View>
-    );
-  }
-
-  if (!hasPermission) {
+  if (!permission?.granted) {
     return (
       <View style={styles.permissionContainer}>
         <Text style={styles.permissionText}>Camera access is required</Text>
-        <TouchableOpacity
-          style={styles.permButton}
-          onPress={async () => {
-            const { status } = await Camera.requestCameraPermissionsAsync();
-            setHasPermission(status === 'granted');
-          }}
-        >
+        <TouchableOpacity style={styles.permButton} onPress={requestPermission}>
           <Text style={styles.permButtonText}>Grant Permission</Text>
         </TouchableOpacity>
       </View>
@@ -60,35 +43,35 @@ export default function ReportIncidentScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
-      <Camera ref={cameraRef} style={styles.camera} type={CameraType.back}>
-        {/* GPS Indicator */}
-        <View style={styles.gpsIndicator}>
-          <View
-            style={[styles.gpsDot, { backgroundColor: gpsReady ? '#00ff88' : '#ff4444' }]}
-          />
-          <Text style={styles.gpsText}>
-            {gpsReady ? 'GPS Ready' : 'Acquiring GPS...'}
-          </Text>
-        </View>
+      <CameraView ref={cameraRef} style={styles.camera} facing="back" />
 
-        {/* Capture Button */}
-        <View style={styles.controls}>
-          <TouchableOpacity
-            style={styles.captureButton}
-            onPress={handleCapture}
-            activeOpacity={0.7}
-          >
-            <View style={styles.captureInner} />
-          </TouchableOpacity>
-        </View>
-      </Camera>
+      {/* GPS Indicator */}
+      <View style={styles.gpsIndicator}>
+        <View
+          style={[styles.gpsDot, { backgroundColor: gpsReady ? '#00ff88' : '#ff4444' }]}
+        />
+        <Text style={styles.gpsText}>
+          {gpsReady ? 'GPS Ready' : 'Acquiring GPS...'}
+        </Text>
+      </View>
+
+      {/* Capture Button */}
+      <View style={styles.controls}>
+        <TouchableOpacity
+          style={styles.captureButton}
+          onPress={handleCapture}
+          activeOpacity={0.7}
+        >
+          <View style={styles.captureInner} />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
-  camera: { flex: 1 },
+  camera: { ...StyleSheet.absoluteFillObject },
   permissionContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -113,6 +96,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
+    zIndex: 10,
   },
   gpsDot: {
     width: 10,
@@ -126,6 +110,7 @@ const styles = StyleSheet.create({
     bottom: 40,
     width: '100%',
     alignItems: 'center',
+    zIndex: 10,
   },
   captureButton: {
     width: 80,

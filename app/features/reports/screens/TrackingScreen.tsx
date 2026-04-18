@@ -1,17 +1,36 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import StatusBadge from '../../../components/feedback/StatusBadge';
-import { TIMELINE_STEPS } from '../../../core/constants';
+
+const TIMELINE_STEPS = [
+  { key: 'submitted', label: 'Submitted', icon: '📤' },
+  { key: 'ai_reviewed', label: 'AI Classified', icon: '🤖' },
+  { key: 'assigned', label: 'Assigned to Dept', icon: '🏢' },
+  { key: 'dispatched', label: 'Crew Dispatched', icon: '🚛' },
+  { key: 'in_progress', label: 'In Progress', icon: '🔧' },
+  { key: 'resolved', label: 'Resolved', icon: '✅' },
+];
+
+function getStepIndex(status: string): number {
+  const idx = TIMELINE_STEPS.findIndex((s) => s.key === status);
+  return idx >= 0 ? idx : 0;
+}
 
 export default function TrackingScreen({ route }: any) {
-  const { id } = route.params ?? {};
-  // TODO: fetch report by ID from store/API
-  const currentStep = 2; // Mock: assigned
+  const { id, report } = route.params ?? {};
+  const currentStep = getStepIndex(report?.status || 'submitted');
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>Issue #{id ?? '---'}</Text>
-      <StatusBadge status="in_progress" />
+      <Text style={styles.title}>Issue #{id ? id.slice(0, 8) : '---'}</Text>
+
+      {report?.issue_type && (
+        <Text style={styles.issueType}>
+          {report.issue_type} · Severity {report.severity}/5
+        </Text>
+      )}
+
+      <StatusBadge status={report?.status || 'submitted'} />
 
       <View style={styles.timeline}>
         {TIMELINE_STEPS.map((step, i) => {
@@ -64,7 +83,14 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '800',
     color: '#1a1a1a',
+    marginBottom: 4,
+  },
+  issueType: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
     marginBottom: 12,
+    textTransform: 'capitalize',
   },
   timeline: {
     marginTop: 32,

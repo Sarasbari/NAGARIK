@@ -1,5 +1,7 @@
-import CityMap from '../../components/map/CityMap';
-import HeatmapLayer from '../../components/map/HeatmapLayer';
+import dynamic from 'next/dynamic';
+
+const CityMap = dynamic(() => import('../../components/map/CityMap'), { ssr: false });
+const HeatmapLayer = dynamic(() => import('../../components/map/HeatmapLayer'), { ssr: false });
 
 export default function RadarPage() {
   return (

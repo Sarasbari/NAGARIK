@@ -43,35 +43,37 @@ export default function CameraScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
-      <CameraView ref={cameraRef} style={styles.camera} facing="back">
-        {/* GPS Indicator */}
-        <View style={styles.gpsIndicator}>
-          <View
-            style={[styles.gpsDot, { backgroundColor: gpsReady ? '#00ff88' : '#ff4444' }]}
-          />
-          <Text style={styles.gpsText}>
-            {gpsReady ? 'GPS Ready' : 'Acquiring GPS...'}
-          </Text>
-        </View>
+      {/* Camera fills the entire view */}
+      <CameraView ref={cameraRef} style={styles.camera} facing="back" />
 
-        {/* Capture Button */}
-        <View style={styles.controls}>
-          <TouchableOpacity
-            style={styles.captureButton}
-            onPress={handleCapture}
-            activeOpacity={0.7}
-          >
-            <View style={styles.captureInner} />
-          </TouchableOpacity>
-        </View>
-      </CameraView>
+      {/* Overlays rendered as siblings with absolute positioning */}
+      {/* GPS Indicator */}
+      <View style={styles.gpsIndicator}>
+        <View
+          style={[styles.gpsDot, { backgroundColor: gpsReady ? '#00ff88' : '#ff4444' }]}
+        />
+        <Text style={styles.gpsText}>
+          {gpsReady ? 'GPS Ready' : 'Acquiring GPS...'}
+        </Text>
+      </View>
+
+      {/* Capture Button */}
+      <View style={styles.controls}>
+        <TouchableOpacity
+          style={styles.captureButton}
+          onPress={handleCapture}
+          activeOpacity={0.7}
+        >
+          <View style={styles.captureInner} />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
-  camera: { flex: 1 },
+  camera: { ...StyleSheet.absoluteFillObject },
   permissionContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -96,6 +98,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
+    zIndex: 10,
   },
   gpsDot: {
     width: 10,
@@ -109,6 +112,7 @@ const styles = StyleSheet.create({
     bottom: 40,
     width: '100%',
     alignItems: 'center',
+    zIndex: 10,
   },
   captureButton: {
     width: 80,

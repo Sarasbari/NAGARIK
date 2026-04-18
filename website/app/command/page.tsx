@@ -1,6 +1,8 @@
-import CityMap from '../../components/map/CityMap';
-import RoutePolyline from '../../components/map/RoutePolyline';
-import DispatchModal from '../../components/dispatch/DispatchModal';
+import dynamic from 'next/dynamic';
+
+const CityMap = dynamic(() => import('../../components/map/CityMap'), { ssr: false });
+const RoutePolyline = dynamic(() => import('../../components/map/RoutePolyline'), { ssr: false });
+const DispatchModal = dynamic(() => import('../../components/dispatch/DispatchModal'), { ssr: false });
 
 export default function CommandPage() {
   return (

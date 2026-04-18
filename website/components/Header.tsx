@@ -3,7 +3,7 @@ import { Bell, Settings, User, RefreshCw, Activity } from 'lucide-react';
 
 export default function Header() {
     return (
-        <header className="h-20 border-b-4 border-black bg-white flex items-center justify-between px-6 sticky top-0 z-40 ml-64">
+        <header className="h-20 border-b-4 border-black bg-white flex items-center justify-between px-6 sticky top-0 z-40">
             <div className="flex items-center gap-4">
                 <div className="bg-neon-green border-4 border-black px-4 py-1 font-black uppercase text-sm italic tracking-tight">
                     City_Command_Center

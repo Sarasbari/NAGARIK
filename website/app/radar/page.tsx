@@ -137,11 +137,25 @@ export default function RadarPage() {
         const fetch_ = async () => {
             const supabase = createClient();
             const { data, error } = await supabase
-                .from('complaints')
-                .select('id, category, title, area, city, latitude, longitude, upvotes, status, submitted_at')
+                .from('reports')
+                .select('id, issue_type, ward, latitude, longitude, status, created_at, severity')
                 .not('latitude', 'is', null)
                 .not('longitude', 'is', null);
-            if (!error) setComplaints(data || []);
+            if (!error && data) {
+                const mappedData: Complaint[] = data.map(r => ({
+                    id: r.id,
+                    category: r.issue_type,
+                    title: r.issue_type,
+                    area: r.ward || 'Unknown Ward',
+                    city: 'Mumbai', // Hardcoded fallback for now
+                    latitude: r.latitude,
+                    longitude: r.longitude,
+                    upvotes: r.severity * 10,
+                    status: 'Pending',
+                    submitted_at: r.created_at
+                }));
+                setComplaints(mappedData);
+            }
             setIsLoading(false);
         };
         fetch_();

@@ -1,22 +1,25 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
+  TextInput,
   TouchableOpacity,
   StyleSheet,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
-import { makeRedirectUri } from 'expo-auth-session';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/hooks/useSession';
 
-WebBrowser.maybeCompleteAuthSession();
-
 export default function LoginScreen() {
   const router = useRouter();
   const { session } = useSession();
+
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (session) {
@@ -24,55 +27,59 @@ export default function LoginScreen() {
     }
   }, [session]);
 
-  const handleGoogleSignIn = async () => {
-    try {
-      const redirectTo = makeRedirectUri({ scheme: 'nagarik' });
-
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo,
-          skipBrowserRedirect: true,
-        },
-      });
-
-      if (error) {
-        Alert.alert('Sign In Error', error.message);
-        return;
-      }
-
-      if (data?.url) {
-        const result = await WebBrowser.openAuthSessionAsync(
-          data.url,
-          redirectTo
-        );
-
-        if (result.type === 'success' && result.url) {
-          const url = new URL(result.url);
-          const params = new URLSearchParams(
-            url.hash ? url.hash.substring(1) : url.search.substring(1)
-          );
-          const access_token = params.get('access_token');
-          const refresh_token = params.get('refresh_token');
-
-          if (access_token && refresh_token) {
-            const { error: sessionError } = await supabase.auth.setSession({
-              access_token,
-              refresh_token,
-            });
-            if (sessionError) {
-              Alert.alert('Session Error', sessionError.message);
-            }
-          }
-        }
-      }
-    } catch (err: any) {
-      Alert.alert('Error', err.message || 'Something went wrong');
+  const validateInputs = () => {
+    if (!email.trim() || !password.trim()) {
+      Alert.alert('Validation Error', 'Please enter both email and password.');
+      return false;
     }
+    return true;
+  };
+
+  const signInWithEmail = async () => {
+    if (!validateInputs()) return;
+    setLoading(true);
+    
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email,
+      password: password,
+    });
+
+    if (error) {
+      Alert.alert('Sign In Failed', error.message);
+    } else if (data.session) {
+      // Direct routing backup, though useEffect should catch it too
+      router.replace('/(tabs)/report');
+    }
+    setLoading(false);
+  };
+
+  const signUpWithEmail = async () => {
+    if (!validateInputs()) return;
+    setLoading(true);
+    
+    const { data, error } = await supabase.auth.signUp({
+      email: email,
+      password: password,
+    });
+
+    if (error) {
+      Alert.alert('Sign Up Failed', error.message);
+    } else if (data.session == null) {
+      Alert.alert(
+        'Email Verification Required',
+        'Please check your inbox. To allow instant login, turn off "Confirm Email" in your Supabase Auth settings.'
+      );
+    } else {
+      router.replace('/(tabs)/report');
+    }
+    setLoading(false);
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView 
+      style={styles.container} 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
       <View style={styles.hero}>
         {/* Tricolor accent bar */}
         <View style={styles.tricolor}>
@@ -87,21 +94,52 @@ export default function LoginScreen() {
         </Text>
       </View>
 
+      <View style={styles.formContainer}>
+        <TextInput
+          style={styles.input}
+          placeholder="Email address"
+          placeholderTextColor="#999"
+          value={email}
+          onChangeText={setEmail}
+          autoCapitalize="none"
+          keyboardType="email-address"
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Password"
+          placeholderTextColor="#999"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+        />
+      </View>
+
       <View style={styles.bottom}>
         <TouchableOpacity
-          style={styles.googleButton}
-          onPress={handleGoogleSignIn}
+          style={styles.primaryButton}
+          onPress={signInWithEmail}
+          disabled={loading}
           activeOpacity={0.8}
         >
-          <Text style={styles.googleIcon}>G</Text>
-          <Text style={styles.googleText}>Continue with Google</Text>
+          <Text style={styles.primaryText}>
+            {loading ? 'Logging in...' : 'Sign In'}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.secondaryButton}
+          onPress={signUpWithEmail}
+          disabled={loading}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.secondaryText}>Create Account</Text>
         </TouchableOpacity>
 
         <Text style={styles.disclaimer}>
           By continuing, you agree to our Terms of Service and Privacy Policy.
         </Text>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -111,11 +149,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFBF5',
     justifyContent: 'space-between',
     paddingHorizontal: 24,
-    paddingTop: 120,
+    paddingTop: 100,
     paddingBottom: 60,
   },
   hero: {
     alignItems: 'center',
+    marginBottom: 40,
   },
   tricolor: {
     flexDirection: 'row',
@@ -141,37 +180,57 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 28,
   },
+  formContainer: {
+    gap: 16,
+    marginBottom: 32,
+  },
+  input: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#E5E5E5',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    color: '#1a1a1a',
+    fontWeight: '600',
+  },
   bottom: {
     alignItems: 'center',
-    gap: 20,
+    gap: 16,
   },
-  googleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  primaryButton: {
     backgroundColor: '#1a1a1a',
     paddingVertical: 16,
     paddingHorizontal: 32,
     borderRadius: 12,
     width: '100%',
-    justifyContent: 'center',
-    gap: 12,
-    borderWidth: 3,
-    borderColor: '#1a1a1a',
+    alignItems: 'center',
   },
-  googleIcon: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#FF9933',
-  },
-  googleText: {
+  primaryText: {
     fontSize: 17,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+  secondaryButton: {
+    backgroundColor: 'transparent',
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    width: '100%',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#1a1a1a',
+  },
+  secondaryText: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#1a1a1a',
   },
   disclaimer: {
     fontSize: 12,
     color: '#999',
     textAlign: 'center',
     lineHeight: 18,
+    marginTop: 16,
   },
 });

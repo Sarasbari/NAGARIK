@@ -10,7 +10,22 @@ load_dotenv()
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-1.5-flash")
+
+def get_best_model():
+    try:
+        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        preferred = ["models/gemini-2.5-flash", "models/gemini-2.0-flash", "models/gemini-1.5-flash-latest", "models/gemini-1.5-flash"]
+        for p in preferred:
+            if p in available_models:
+                return genai.GenerativeModel(p)
+        # Fallback to whatever the first available is if none of the preferred exist
+        if available_models:
+            return genai.GenerativeModel(available_models[0])
+    except Exception:
+        pass
+    return genai.GenerativeModel("gemini-2.5-flash")
+
+model = get_best_model()
 
 SYSTEM_PROMPT = """You are a civic infrastructure image verifier for India.
 Analyze the image and respond ONLY with this JSON — no markdown, no explanation:

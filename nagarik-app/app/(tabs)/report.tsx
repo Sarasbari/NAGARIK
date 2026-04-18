@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
+import * as FileSystem from 'expo-file-system/legacy';
 import { supabase } from '@/lib/supabase';
 import { analyzeReport } from '@/lib/ml';
 import { useSession } from '@/hooks/useSession';
@@ -109,12 +110,35 @@ export default function ReportScreen() {
       const timestamp = Date.now();
       const fileName = `${user.id}_${timestamp}.jpg`;
 
-      const response = await fetch(imageUri);
-      const blob = await response.blob();
+      // Read file cleanly using Expo FileSystem
+      const base64Str = await FileSystem.readAsStringAsync(imageUri, {
+        encoding: 'base64',
+      });
+
+      // Convert Base64 to Uint8Array safely for cross-platform
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+      const lookup = new Uint8Array(256);
+      for (let i = 0; i < chars.length; i++) lookup[chars.charCodeAt(i)] = i;
+
+      let bufferLength = base64Str.length * 0.75;
+      if (base64Str[base64Str.length - 1] === '=') bufferLength--;
+      if (base64Str[base64Str.length - 2] === '=') bufferLength--;
+
+      const bytes = new Uint8Array(bufferLength);
+      let p = 0;
+      for (let i = 0; i < base64Str.length; i += 4) {
+        let encoded1 = lookup[base64Str.charCodeAt(i)];
+        let encoded2 = lookup[base64Str.charCodeAt(i+1)];
+        let encoded3 = lookup[base64Str.charCodeAt(i+2)];
+        let encoded4 = lookup[base64Str.charCodeAt(i+3)];
+        bytes[p++] = (encoded1 << 2) | (encoded2 >> 4);
+        if (encoded3 !== 64) bytes[p++] = ((encoded2 & 15) << 4) | (encoded3 >> 2);
+        if (encoded4 !== 64) bytes[p++] = ((encoded3 & 3) << 6) | (encoded4 & 63);
+      }
 
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('report-images')
-        .upload(fileName, blob, {
+        .upload(fileName, bytes, {
           contentType: 'image/jpeg',
           upsert: false,
         });
@@ -140,30 +164,31 @@ export default function ReportScreen() {
         longitude,
       });
 
-      // 5. Handle result
-      if (mlResult.accepted) {
-        const { error: insertError } = await supabase.from('reports').insert({
-          user_id: user.id,
-          image_url: imageUrl,
-          description: description || null,
-          category,
-          latitude,
-          longitude,
-          status: 'verified',
-          severity: mlResult.severity,
-        });
+      // 5. Always securely store the report in database (both verified and rejected records)
+      const { error: insertError } = await supabase.from('reports').insert({
+        user_id: user.id,
+        image_url: imageUrl,
+        description: description || null,
+        category,
+        latitude,
+        longitude,
+        status: mlResult.accepted ? 'verified' : 'rejected',
+        severity: mlResult.severity || 0,
+        ml_reason: mlResult.reason || null,
+      });
 
-        if (insertError) {
-          Alert.alert('Database error', insertError.message);
+      if (insertError) {
+        Alert.alert('Database error', insertError.message);
+      } else {
+        if (mlResult.accepted) {
+          Alert.alert('✅ Success', 'Report verified by ML & submitted successfully!', [
+            { text: 'OK', onPress: resetForm },
+          ]);
         } else {
-          Alert.alert('✅ Success', 'Report submitted successfully!', [
+          Alert.alert('❌ Report rejected by ML', `Reason: ${mlResult.reason}\n\nYour attempt has still been logged in the system.`, [
             { text: 'OK', onPress: resetForm },
           ]);
         }
-      } else {
-        // Rejected — clean up uploaded image
-        await supabase.storage.from('report-images').remove([fileName]);
-        Alert.alert('❌ Report rejected', mlResult.reason || 'The ML service rejected your report.');
       }
     } catch (err: any) {
       Alert.alert('Error', err.message || 'Something went wrong during submission.');

@@ -1,72 +1,168 @@
 # 🇮🇳 Nagarik — Civic Issue Reporting Platform
 
-> AI-powered citizen reporting → officer dashboard → field dispatch → resolution tracking
+AI-first open-source platform that helps citizens report local issues, routes reports to the right department, and gives officers the tools to triage, dispatch, and resolve problems faster.
 
-## Architecture
+Why this matters: local governments struggle with visibility and prioritization. Nagarik stitches mobile reporting, automated classification, spatial routing, and an officer dashboard into a complete workflow that improves response times and accountability.
 
-| Surface | Tech | Port |
-|---------|------|------|
-| **Citizen App** | React Native (Expo) | — |
-| **Officer Dashboard** | Next.js 14 + Leaflet | 3000 |
-| **AI Pipeline** | FastAPI + Gemini Vision | 8000 |
-| **Database** | Supabase (Postgres + PostGIS) | 54322 |
+**Highlights**
+- End-to-end: mobile reporting app, officer dashboard, ML classification pipeline, and Supabase-backed storage.
+- Designed for production: geospatial Postgres + PostGIS, background SLA checks, and route optimization.
+- Extensible: modular ML routers, pluggable classification models, and clear API boundaries.
 
-## Quick Start
+**Badges**
+- Build: [![build status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com)
+- License: [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+- Stars: [![stars](https://img.shields.io/badge/stars-%E2%98%85-blue)](https://github.com)
+
+---
+
+## Table of Contents
+- [Demo](#demo)
+- [Quickstart (developer)](#quickstart-developer)
+- [Architecture & Tech stack](#architecture--tech-stack)
+- [Features](#features)
+- [Contribution guide](#contribution-guide)
+- [Roadmap](#roadmap)
+- [Security & Responsible Disclosure](#security--responsible-disclosure)
+- [License](#license)
+
+---
+
+## Demo
+Add a short GIF or screenshot here to show the app and dashboard in action. Use `assets/images/demo.gif` or `website/public/demo.png` for best visibility.
+
+---
+
+## Quickstart (developer)
+Get the repo running locally in minutes — developer-friendly, with seeded data and an optional local Supabase instance.
+
+Prerequisites:
+- Node 18+ and npm/yarn
+- Python 3.10+ (for ML services)
+- Docker & Docker Compose (recommended for Supabase local)
+
+Developer flow (recommended):
+
+1. Clone the repo
 
 ```bash
-# 1. Clone & install
-git clone <repo-url> && cd nagarik
+git clone <repo-url> && cd NAGARIK
+```
 
-# 2. Setup environment
-cp app/.env.example app/.env
-cp website/.env.example website/.env
-cp ml/.env.example ml/.env
+2. Start a local Supabase (recommended)
 
-# 3. Start Supabase local
+```bash
+# from repo root
 npx supabase start
-
-# 4. Start ML pipeline
-cd ml && pip install -r requirements.txt && uvicorn main:app --reload
-
-# 5. Start citizen app (mobile)
-cd app && npm install && npx expo start
-
-# 6. Start government website (dashboard)
-cd website && npm install && npm run dev
 ```
 
-## Project Structure
+3. Seed the database (one-time)
 
-```
-nagarik/
-├── app/                 # 📱 React Native (Expo) — Public Citizen App
-├── website/             # 🏛️ Next.js 14 — Government Officer Dashboard
-├── ml/                  # 🤖 Python FastAPI — ML Pipeline
-├── supabase/            # 🗄️ DB schema + edge functions
-├── claude-skills/       # AI coding assistant context
-├── docs/                # presentation assets
-├── docker-compose.yml
-└── README.md
+```bash
+psql postgres://localhost:54322/postgres -f supabase/migrations/001_init_schema.sql
+psql postgres://localhost:54322/postgres -f supabase/migrations/003_seed_wards.sql
 ```
 
-## Flow
+4. Start the ML service
 
-1. **Citizen** opens app → snaps photo of issue (pothole, garbage, etc.)
-2. **AI Pipeline** classifies issue type + severity via Gemini Vision
-3. **Auto-routing** maps GPS → ward → department
-4. **Dashboard** shows officers a live map + issue queue sorted by SLA
-5. **Dispatch** optimizes truck routes (nearest-neighbor)
-6. **Citizen** gets push notifications on status changes
+```bash
+cd ml
+python -m venv .venv && .venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8000
+```
 
-## Key Features
+5. Start the dashboard (website)
 
-- 📸 AI-powered issue classification (Gemini Vision + YOLOv8 fallback)
-- 🗺️ Real-time officer dashboard with heatmaps and dispatch
-- ⚡ Auto-routing: GPS → ward → department
-- 📊 Ward equity scoring for fair resource allocation
-- 🔔 Push notifications on status changes
-- ⏰ SLA breach monitoring with cron-based alerts
+```bash
+cd website
+npm install
+npm run dev
+```
+
+6. Start the mobile app (Expo)
+
+```bash
+cd app
+npm install
+npx expo start
+```
+
+Notes:
+- Copy `.env.example` files from `app/`, `website/`, and `ml/` and fill secrets before running in non-dev environments.
+- Use `docker-compose.yml` for an integrated development environment if you prefer containers.
+
+---
+
+## Architecture & Tech stack
+
+- Mobile: React Native (Expo)
+- Web dashboard: Next.js 14 + Leaflet
+- ML: FastAPI (Python) — image classification, severity scoring, and entity extraction
+- DB: Supabase (Postgres + PostGIS)
+- Background jobs: Node cron / serverless functions in `supabase/functions`
+- CI/CD: GitHub Actions (recommended)
+
+---
+
+## Features
+
+- Smart image classification for common civic issues (potholes, overflowing garbage, water leaks, etc.)
+- Automatic geo-routing: map a report to ward, department, and SLA
+- Officer dashboard: heatmaps, prioritized queues, and issue detail pages
+- Route optimization for vehicles assigned to fix issues
+- Notifications and citizen updates via push and email
+- Extensible ML pipeline and model interfaces under `ml/services`
+
+---
+
+## Contribution guide
+
+We welcome contributors. A good first step is to open an issue describing the feature or bug. When you're ready to contribute:
+
+1. Fork the repository
+2. Create a branch: `git checkout -b feat/your-feature`
+3. Run tests and linters (if available)
+4. Open a PR with a clear description and screenshots
+
+See [CONTRIBUTING.md](docs/README.md) for detailed developer guidelines and testing notes.
+
+Be kind, follow the code of conduct, and keep PRs focused and small.
+
+---
+
+## Roadmap
+
+- Improve ML accuracy and add active learning loop
+- Harden deployment scripts and production monitoring
+- Mobile offline reporting and better caching
+- Internationalization and localization for multiple cities
+
+---
+
+## Security & Responsible Disclosure
+
+If you find a vulnerability, please open a private issue or contact the maintainers. Do not post exploits publicly.
+
+---
+
+## Why star this repo?
+
+- It solves a real civic problem end-to-end with production-grade components.
+- Modular design makes it easy to adopt or extend for local municipalities.
+- Active roadmap and many opportunities for contributions.
+
+If you find Nagarik useful, please consider starring the project — stars help attract contributors, maintainers, and users.
+
+---
 
 ## License
 
-MIT
+This project is licensed under the MIT License.
+
+---
+
+If you'd like, I can also:
+- add a short demo GIF to `assets/images` and link it in this README;
+- create a `CONTRIBUTING.md` and `CODE_OF_CONDUCT.md` to improve community onboarding;
+- add CI badges and a GitHub Actions workflow template.

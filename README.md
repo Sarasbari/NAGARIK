@@ -1,168 +1,128 @@
-# 🇮🇳 Nagarik — Civic Issue Reporting Platform
+# 🇮🇳 Nagarik — Civic Infrastructure Platform
 
-AI-first open-source platform that helps citizens report local issues, routes reports to the right department, and gives officers the tools to triage, dispatch, and resolve problems faster.
+> AI-powered citizen reporting → strict officer dashboard → automated field dispatch → resolution tracking.
 
-Why this matters: local governments struggle with visibility and prioritization. Nagarik stitches mobile reporting, automated classification, spatial routing, and an officer dashboard into a complete workflow that improves response times and accountability.
+**Nagarik** is an intelligent, scalable civic infrastructure platform designed to bridge the gap between citizens reporting local issues and municipal corporations managing rapid dispatches.
 
-**Highlights**
-- End-to-end: mobile reporting app, officer dashboard, ML classification pipeline, and Supabase-backed storage.
-- Designed for production: geospatial Postgres + PostGIS, background SLA checks, and route optimization.
-- Extensible: modular ML routers, pluggable classification models, and clear API boundaries.
+## 🚨 The Problem
+Modern municipal corporations are highly bureaucratic and overwhelmed with unstructured data. Citizens submit thousands of complaints daily, many of which are:
+- **Duplicates or spam** (e.g., taking pictures of selfies instead of potholes).
+- **Lacking actionable location data** (generic addresses instead of precise geospatial coordinates).
+- **Unprioritized** (a massive sinkhole gets the same queue position as an overflowing trash can).
+This results in massive SLA breaches, wasted fuel for dispatch trucks, and a broken feedback loop with citizens.
 
-**Badges**
-- Build: [![build status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com)
-- License: [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-- Stars: [![stars](https://img.shields.io/badge/stars-%E2%98%85-blue)](https://github.com)
-
----
-
-## Table of Contents
-- [Demo](#demo)
-- [Quickstart (developer)](#quickstart-developer)
-- [Architecture & Tech stack](#architecture--tech-stack)
-- [Features](#features)
-- [Contribution guide](#contribution-guide)
-- [Roadmap](#roadmap)
-- [Security & Responsible Disclosure](#security--responsible-disclosure)
-- [License](#license)
+## 💡 The Solution
+Nagarik forces a strict, AI-validated pipeline that eliminates human sorting:
+1. **Zero-Spam Intelligence**: Every citizen photo passes through Google Gemini Vision. If it's not a real issue, the platform rejects it before it even hits the database.
+2. **Automated Severity & Routing**: The AI assigns a `Severity Score (1-5)` based on visual hazard levels and strictly forces the issue into its relevant category (e.g., `Water Leakage`, `Road Pothole`).
+3. **Preventive Command Center**: Officers are presented with a brutalist, distraction-free dashboard mapping issues via GeoJSON boundaries, with auto-ticking SLA countdown timers. Needs are visually aggregated into geospatial hotspots.
 
 ---
 
-## Demo
-Add a short GIF or screenshot here to show the app and dashboard in action. Use `assets/images/demo.gif` or `website/public/demo.png` for best visibility.
+## 🏗️ Architecture & Tech Stack
+
+![Tech Stack](./docs/tech-stack.png)
+<br/>
+![System Architecture Flowchart](./docs/architecture.png)
+
+The project is built as a highly decoupled microservices architecture functioning in tandem:
+
+| Component | Technology | Description |
+|-----------|------------|-------------|
+| **Nagarik Mobile App** | React Native (Expo) | A fast, location-aware mobile application allowing citizens to snap photos of municipal issues (potholes, garbage, etc.) and submit them instantly. Uses Base64 transport for cross-network compatibility. |
+| **Command Dashboard** | Next.js 14, Tailwind, Leaflet | A robust, web-based municipal dashboard used by city officers. Features real-time Supabase subscriptions updating live maps, statistics, and issue queues seamlessly. |
+| **ML/AI Microservice** | Python, FastAPI, Gemini | A dedicated Python microservice handling image inference. Validates if an image contains a legitimate civic issue, estimates severity (1-5), provides bounding context, and filters junk. |
+| **Infrastructure** | Supabase (Postgres + PostGIS) | Serves as the central unified backend tracking user authentication, report storage, geospatial coordinates, and real-time syncing. |
 
 ---
 
-## Quickstart (developer)
-Get the repo running locally in minutes — developer-friendly, with seeded data and an optional local Supabase instance.
+## 🚀 Quick Start Guide
 
-Prerequisites:
-- Node 18+ and npm/yarn
-- Python 3.10+ (for ML services)
-- Docker & Docker Compose (recommended for Supabase local)
+### 1. Prerequisites
+- Node.js (v18+)
+- Python 3.10+
+- Supabase Account
+- Google Gemini API Key
 
-Developer flow (recommended):
-
-1. Clone the repo
-
+### 2. General Setup
 ```bash
-git clone <repo-url> && cd NAGARIK
+# Clone the repository
+git clone <repo-url>
+cd NAGARIK
 ```
 
-2. Start a local Supabase (recommended)
+### 3. Supabase Configuration
+The application relies on Supabase for both Auth and Database operations.
+1. Create a new Supabase project.
+2. Run the SQL schema found in `nagarik-app/supabase/migration.sql` inside your Supabase SQL Editor.
+3. Keep your `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` handy.
 
-```bash
-# from repo root
-npx supabase start
-```
-
-3. Seed the database (one-time)
-
-```bash
-psql postgres://localhost:54322/postgres -f supabase/migrations/001_init_schema.sql
-psql postgres://localhost:54322/postgres -f supabase/migrations/003_seed_wards.sql
-```
-
-4. Start the ML service
+### 4. ML Microservice (FastAPI)
+The central intelligence layer parsing citizen reports.
 
 ```bash
 cd ml
-python -m venv .venv && .venv\Scripts\activate
+# Create virtual environment
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install dependencies
 pip install -r requirements.txt
-uvicorn main:app --reload --port 8000
+
+# Configure Environment
+echo "GEMINI_API_KEY=your_key_here" > .env
+
+# Run server (default: port 8000)
+python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-5. Start the dashboard (website)
+### 5. Municipal Dashboard (Next.js)
+The high-performance tracking and command interface.
 
 ```bash
 cd website
+# Install dependencies
 npm install
+
+# Configure Environment (.env.local)
+# NEXT_PUBLIC_SUPABASE_URL=...
+# NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+
+# Run the development server
 npm run dev
 ```
 
-6. Start the mobile app (Expo)
+### 6. Citizen App (React Native/Expo)
+The front-line reporting tool.
 
 ```bash
-cd app
+cd nagarik-app
+# Install dependencies
 npm install
+
+# Configure Environment (.env)
+# EXPO_PUBLIC_SUPABASE_URL=...
+# EXPO_PUBLIC_SUPABASE_ANON_KEY=...
+# EXPO_PUBLIC_ML_URL=http://<your-local-ip>:8000
+
+# Start Expo
 npx expo start
 ```
 
-Notes:
-- Copy `.env.example` files from `app/`, `website/`, and `ml/` and fill secrets before running in non-dev environments.
-- Use `docker-compose.yml` for an integrated development environment if you prefer containers.
+---
+
+## 🛠️ Key Features & Workflows
+
+1. **AI Image Validation**: The Python backend ensures that citizens aren't uploading blank images, selfies, or non-related photos. Gemini strictly categorizes the image into sets like `Road Pothole`, `Water Leakage`, or `Garbage Accumulation`.
+2. **Real-time Map Synchronization**: Using Supabase's realtime subscriptions (`postgres_changes`), whenever an issue passes the ML gate and hits the database, the officer's Dashboard Map updates within milliseconds.
+3. **Severe Incident Escalation**: Issues flagged with a `Severity of 5` skip standard queues and are immediately pinged as Critical inside the web dashboard.
+4. **Resilient Architecture**: All maps are built to avoid DOM recycling conflicts on Fast Refresh, and the mobile application transmits heavily compressed base64 images to bypass standard VPN or Hermes network blocks in constrained environments.
 
 ---
 
-## Architecture & Tech stack
+## 🔒 Security & Privacy
+- **Geospatial Privacy**: User coordinates are bound strictly to the issue and only visible to authenticated municipal officers.
+- **Data Integrity**: The ML microservice denies any payloads missing base64 headers or standard latitude/longitude markers.
 
-- Mobile: React Native (Expo)
-- Web dashboard: Next.js 14 + Leaflet
-- ML: FastAPI (Python) — image classification, severity scoring, and entity extraction
-- DB: Supabase (Postgres + PostGIS)
-- Background jobs: Node cron / serverless functions in `supabase/functions`
-- CI/CD: GitHub Actions (recommended)
-
----
-
-## Features
-
-- Smart image classification for common civic issues (potholes, overflowing garbage, water leaks, etc.)
-- Automatic geo-routing: map a report to ward, department, and SLA
-- Officer dashboard: heatmaps, prioritized queues, and issue detail pages
-- Route optimization for vehicles assigned to fix issues
-- Notifications and citizen updates via push and email
-- Extensible ML pipeline and model interfaces under `ml/services`
-
----
-
-## Contribution guide
-
-We welcome contributors. A good first step is to open an issue describing the feature or bug. When you're ready to contribute:
-
-1. Fork the repository
-2. Create a branch: `git checkout -b feat/your-feature`
-3. Run tests and linters (if available)
-4. Open a PR with a clear description and screenshots
-
-See [CONTRIBUTING.md](docs/README.md) for detailed developer guidelines and testing notes.
-
-Be kind, follow the code of conduct, and keep PRs focused and small.
-
----
-
-## Roadmap
-
-- Improve ML accuracy and add active learning loop
-- Harden deployment scripts and production monitoring
-- Mobile offline reporting and better caching
-- Internationalization and localization for multiple cities
-
----
-
-## Security & Responsible Disclosure
-
-If you find a vulnerability, please open a private issue or contact the maintainers. Do not post exploits publicly.
-
----
-
-## Why star this repo?
-
-- It solves a real civic problem end-to-end with production-grade components.
-- Modular design makes it easy to adopt or extend for local municipalities.
-- Active roadmap and many opportunities for contributions.
-
-If you find Nagarik useful, please consider starring the project — stars help attract contributors, maintainers, and users.
-
----
-
-## License
-
-This project is licensed under the MIT License.
-
----
-
-If you'd like, I can also:
-- add a short demo GIF to `assets/images` and link it in this README;
-- create a `CONTRIBUTING.md` and `CODE_OF_CONDUCT.md` to improve community onboarding;
-- add CI badges and a GitHub Actions workflow template.
+## 📄 License
+Licensed under MIT. Open-sourced for local government implementation.

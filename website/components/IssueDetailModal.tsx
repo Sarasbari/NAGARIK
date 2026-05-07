@@ -2,6 +2,9 @@
 
 import React from 'react';
 import { X, MapPin, Check, Ban } from 'lucide-react';
+import dynamic from 'next/dynamic';
+
+const MiniMap = dynamic(() => import('@/components/map/MiniMap'), { ssr: false });
 
 interface IssueDetailModalProps {
     isOpen: boolean;
@@ -19,6 +22,8 @@ interface IssueDetailModalProps {
         reporterRole?: string;
         reporterDistrict?: string;
         category?: string;
+        latitude?: number;
+        longitude?: number;
         stats?: { label: string; value: string; color?: string }[];
         acceptedAt?: number;
     } | null;
@@ -138,15 +143,21 @@ export default function IssueDetailModal({ isOpen, onClose, issue, isAcceptedVie
                             <div className="flex justify-between items-center mb-4">
                                 <h3 className="font-black uppercase tracking-tighter text-xl">Exact Location</h3>
                                 <div className="bg-black text-white px-3 py-1 text-[10px] font-black uppercase tracking-widest">
-                                    COORD: 19.1136° N, 72.8297° E
+                                    COORD: {issue.latitude ? `${issue.latitude.toFixed(4)}° N, ${issue.longitude?.toFixed(4)}° E` : 'NOT PROVIDED'}
                                 </div>
                             </div>
                             <div className="border-4 border-black h-48 bg-gray-300 relative flex items-center justify-center overflow-hidden">
                                 {/* Simulated map background with a grid to look tactical */}
-                                <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
-                                <div className="border-4 border-neon-orange p-2 animate-pulse bg-white/50 backdrop-blur-sm z-10">
-                                    <MapPin size={32} className="text-neon-orange fill-neon-orange" />
-                                </div>
+                                {issue.latitude && issue.longitude ? (
+                                    <MiniMap lat={issue.latitude} lng={issue.longitude} />
+                                ) : (
+                                    <>
+                                        <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
+                                        <div className="border-4 border-neon-orange p-2 bg-white/50 backdrop-blur-sm z-10 text-black font-black text-xs uppercase tracking-widest">
+                                            Coordinates Unavailable
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         </div>
                     </div>

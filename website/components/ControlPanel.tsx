@@ -109,7 +109,7 @@ export default function ControlPanel() {
     }, []);
 
     return (
-        <div className="w-[420px] relative bg-white border-4 border-black flex flex-col shadow-brutal">
+        <div className="w-[420px] h-full relative bg-white border-4 border-black flex flex-col shadow-brutal">
             <IssueDetailModal 
                 isOpen={!!selectedWork} 
                 onClose={() => setSelectedWork(null)} 

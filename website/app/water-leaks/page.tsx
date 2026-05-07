@@ -20,6 +20,8 @@ interface Complaint {
     submitted_at: string;
     landmark: string;
     category: string;
+    latitude: number;
+    longitude: number;
 }
 
 function timeAgo(dateStr: string): string {
@@ -143,6 +145,8 @@ export default function WaterLeaksPage() {
                                                 description: c.description,
                                                 location: c.city,
                                                 subLocation: c.area,
+                                                latitude: c.latitude,
+                                                longitude: c.longitude,
                                                 status: mapStatus(c.status, c.upvotes),
                                                 image: c.image_url || 'https://placehold.co/600x400?text=No+Image',
                                                 date: new Date(c.submitted_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase(),

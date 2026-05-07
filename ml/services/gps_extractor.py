@@ -1,60 +1,61 @@
-"""GPS Extraction from EXIF Metadata"""
+"""
+GPS Extractor — extracts GPS coordinates from image EXIF data.
+Currently unused since the app sends coordinates directly,
+but available for future use with raw image uploads.
+"""
 
-from typing import Tuple, Optional
 from PIL import Image
 from PIL.ExifTags import TAGS, GPSTAGS
+from io import BytesIO
+from typing import Optional, Tuple
 
-def extract_gps(image_path: str) -> Tuple[Optional[float], Optional[float]]:
+
+def _get_decimal_from_dms(dms: tuple, ref: str) -> float:
+    """Convert DMS (degrees, minutes, seconds) to decimal degrees."""
+    degrees = float(dms[0])
+    minutes = float(dms[1])
+    seconds = float(dms[2])
+    decimal = degrees + (minutes / 60.0) + (seconds / 3600.0)
+    if ref in ("S", "W"):
+        decimal = -decimal
+    return decimal
+
+
+def extract_gps(image_bytes: bytes) -> Optional[Tuple[float, float]]:
     """
-    Extract latitude and longitude from image EXIF data.
-
-    Returns (latitude, longitude) or (None, None) if no GPS data found.
+    Extract GPS coordinates from EXIF data.
+    Returns (latitude, longitude) or None if not found.
     """
     try:
-        img = Image.open(image_path)
-        exif = img.getexif()
+        image = Image.open(BytesIO(image_bytes))
+        exif_data = image._getexif()
 
-        if exif is None:
-            return None, None
+        if not exif_data:
+            return None
 
-        # Get GPSInfo tag (tag 0x8825)
-        gps_info = exif.get_ifd(0x8825)
+        gps_info = {}
+        for tag_id, value in exif_data.items():
+            tag = TAGS.get(tag_id, tag_id)
+            if tag == "GPSInfo":
+                for gps_tag_id in value:
+                    gps_tag = GPSTAGS.get(gps_tag_id, gps_tag_id)
+                    gps_info[gps_tag] = value[gps_tag_id]
+
         if not gps_info:
-            return None, None
+            return None
 
-        # Parse GPS coordinates
-        lat = _convert_to_degrees(gps_info.get(2))  # GPSLatitude
-        lng = _convert_to_degrees(gps_info.get(4))  # GPSLongitude
+        lat_dms = gps_info.get("GPSLatitude")
+        lat_ref = gps_info.get("GPSLatitudeRef")
+        lon_dms = gps_info.get("GPSLongitude")
+        lon_ref = gps_info.get("GPSLongitudeRef")
 
-        # Apply N/S and E/W references
-        lat_ref = gps_info.get(1)
-        lng_ref = gps_info.get(3)
-        if isinstance(lat_ref, bytes):
-            lat_ref = lat_ref.decode(errors="ignore")
-        if isinstance(lng_ref, bytes):
-            lng_ref = lng_ref.decode(errors="ignore")
-        
-        if lat_ref == 'S':
-            lat = -lat
-        if lng_ref == 'W':
-            lng = -lng
+        if not all([lat_dms, lat_ref, lon_dms, lon_ref]):
+            return None
 
-        return lat, lng
-    except Exception as e:
-        print(f"[GPS Extraction Error] {e}")
-        return None, None
+        latitude = _get_decimal_from_dms(lat_dms, lat_ref)
+        longitude = _get_decimal_from_dms(lon_dms, lon_ref)
 
-def _convert_to_degrees(value) -> float:
-    """
-    Convert GPS EXIF coordinate to decimal degrees.
-    EXIF stores GPS as ((deg, 1), (min, 1), (sec, 100)) or IFDRationals.
-    """
-    if not value or len(value) < 3:
-        return 0.0
-    try:
-        d = float(value[0])
-        m = float(value[1])
-        s = float(value[2])
-        return d + (m / 60.0) + (s / 3600.0)
-    except (IndexError, TypeError, ZeroDivisionError, ValueError):
-        return 0.0
+        return (latitude, longitude)
+
+    except Exception:
+        return None

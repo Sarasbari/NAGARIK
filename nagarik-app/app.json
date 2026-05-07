@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "NAGARIK",
+    "slug": "nagarik",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "nagarik",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#FF9933"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.nagarik.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "NAGARIK needs camera access to photograph civic issues.",
+        "NSPhotoLibraryUsageDescription": "NAGARIK needs gallery access to select issue photos.",
+        "NSLocationWhenInUseUsageDescription": "NAGARIK needs your location to tag issue reports."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#FF9933"
+      },
+      "package": "com.nagarik.app",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-camera",
+      "expo-location",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "NAGARIK needs gallery access to select issue photos."
+        }
+      ]
+    ]
+  }
+}

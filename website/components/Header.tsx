@@ -20,7 +20,7 @@ export default function Header({ title = 'City_Command_Center' }: HeaderProps) {
     );
 
     return (
-        <header className="h-20 border-b-4 border-black bg-white flex items-center justify-between pr-6 sticky top-0 z-40 pl-[17.5rem]">
+        <header className="h-20 border-b-4 border-black bg-white flex items-center justify-between px-8 sticky top-0 z-40">
             <div className="flex items-center gap-4">
                 <div className="px-4 py-1 font-black uppercase text-2xl italic tracking-tighter flex items-center">
                     {title === 'City_Command_Center' ? (
